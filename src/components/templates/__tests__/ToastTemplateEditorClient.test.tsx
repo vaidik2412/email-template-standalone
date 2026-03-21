@@ -6,6 +6,10 @@ const mockState = vi.hoisted(() => ({
   latestProps: null as any,
   insertText: vi.fn(),
   setMarkdown: vi.fn(),
+  getSelection: vi.fn().mockReturnValue([5, 5]),
+  setSelection: vi.fn(),
+  focus: vi.fn(),
+  moveCursorToEnd: vi.fn(),
 }));
 
 vi.mock('@toast-ui/react-editor', async () => {
@@ -19,6 +23,10 @@ vi.mock('@toast-ui/react-editor', async () => {
         getMarkdown: () => props.initialValue || '',
         insertText: mockState.insertText,
         setMarkdown: mockState.setMarkdown,
+        getSelection: mockState.getSelection,
+        setSelection: mockState.setSelection,
+        focus: mockState.focus,
+        moveCursorToEnd: mockState.moveCursorToEnd,
       }),
     }));
 
@@ -33,27 +41,47 @@ vi.mock('@toast-ui/react-editor', async () => {
 import ToastTemplateEditorClient from '../ToastTemplateEditorClient';
 
 describe('ToastTemplateEditorClient', () => {
-  it('uses prod-like editor config without inline preview and with add variable toolbar action', () => {
+  it('uses prod-like editor config without an editor-specific add variable toolbar action', () => {
     render(<ToastTemplateEditorClient value='Hello' onChange={vi.fn()} />);
 
     expect(screen.getByTestId('mock-toast-editor')).toBeInTheDocument();
     expect(mockState.latestProps.previewStyle).toBe('tab');
     expect(mockState.latestProps.initialEditType).toBe('wysiwyg');
     expect(mockState.latestProps.hideModeSwitch).toBe(true);
-
-    const lastToolbarGroup =
-      mockState.latestProps.toolbarItems[mockState.latestProps.toolbarItems.length - 1];
-    const addVariableItem = lastToolbarGroup[0];
-
-    expect(lastToolbarGroup).toEqual(
+    expect(mockState.latestProps.toolbarItems.flat()).not.toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           tooltip: 'Add variable',
         }),
       ]),
     );
-    expect(addVariableItem.name).toBe('Add variable');
-    expect(addVariableItem.text).toBe('Add variable +');
-    expect(addVariableItem.el.className).toContain('editor-toolbar-btn');
+  });
+
+  it('applies an external variable insertion request at the remembered body selection', () => {
+    const onActivate = vi.fn();
+    const { rerender } = render(
+      <ToastTemplateEditorClient
+        value='Hello'
+        onChange={vi.fn()}
+        onActivate={onActivate}
+        pendingVariableInsertion={null}
+      />,
+    );
+
+    mockState.latestProps.onFocus?.('wysiwyg');
+
+    rerender(
+      <ToastTemplateEditorClient
+        value='Hello'
+        onChange={vi.fn()}
+        onActivate={onActivate}
+        pendingVariableInsertion={{ id: 1, variableKey: 'contact.name' }}
+      />,
+    );
+
+    expect(onActivate).toHaveBeenCalled();
+    expect(mockState.focus).toHaveBeenCalled();
+    expect(mockState.setSelection).toHaveBeenCalledWith(5, 5);
+    expect(mockState.insertText).toHaveBeenCalledWith('{{contact.name}}');
   });
 });

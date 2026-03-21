@@ -9,5 +9,6 @@ export const templateFormSchema = object({
     .oneOf(ENABLED_EMAIL_TEMPLATE_TYPE_KEYS)
     .required('Category is required'),
   body: string().required('Body is required').trim().default(''),
+  signature: string().default(''),
   isArchived: bool().default(false),
 });

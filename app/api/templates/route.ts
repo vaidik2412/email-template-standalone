@@ -5,21 +5,42 @@ function parsePublishIntent(request: Request) {
   return searchParams.get('isPublished') === 'true';
 }
 
-export async function GET() {
-  const response = await listTemplates();
+function jsonErrorResponse(error: unknown) {
+  const message = error instanceof Error ? error.message : 'Something went wrong';
 
-  return Response.json(response, {
-    status: 200,
-  });
+  return Response.json(
+    {
+      message,
+    },
+    {
+      status: 500,
+    },
+  );
+}
+
+export async function GET() {
+  try {
+    const response = await listTemplates();
+
+    return Response.json(response, {
+      status: 200,
+    });
+  } catch (error) {
+    return jsonErrorResponse(error);
+  }
 }
 
 export async function POST(request: Request) {
-  const payload = await request.json();
-  const response = await createTemplate(payload, {
-    isPublished: parsePublishIntent(request),
-  });
+  try {
+    const payload = await request.json();
+    const response = await createTemplate(payload, {
+      isPublished: parsePublishIntent(request),
+    });
 
-  return Response.json(response, {
-    status: 201,
-  });
+    return Response.json(response, {
+      status: 201,
+    });
+  } catch (error) {
+    return jsonErrorResponse(error);
+  }
 }

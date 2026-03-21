@@ -10,6 +10,19 @@ function parsePublishIntent(request: Request) {
   return searchParams.get('isPublished') === 'true';
 }
 
+function jsonErrorResponse(error: unknown) {
+  const message = error instanceof Error ? error.message : 'Something went wrong';
+
+  return Response.json(
+    {
+      message,
+    },
+    {
+      status: 500,
+    },
+  );
+}
+
 export async function GET(_request: Request, context: RouteContext) {
   const { id } = await context.params;
 
@@ -31,15 +44,15 @@ export async function GET(_request: Request, context: RouteContext) {
       );
     }
 
-    throw error;
+    return jsonErrorResponse(error);
   }
 }
 
 export async function PATCH(request: Request, context: RouteContext) {
   const { id } = await context.params;
-  const payload = await request.json();
 
   try {
+    const payload = await request.json();
     const response = await updateTemplate(id, payload, {
       isPublished: parsePublishIntent(request),
     });
@@ -59,6 +72,6 @@ export async function PATCH(request: Request, context: RouteContext) {
       );
     }
 
-    throw error;
+    return jsonErrorResponse(error);
   }
 }

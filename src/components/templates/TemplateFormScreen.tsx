@@ -9,9 +9,20 @@ import type { SerializedMessageTemplate, TemplateWritePayload } from '@/types/me
 import { removeMarkdownEditorsInternalVariables } from '@/utils/removeMarkdownEditorsInternalVariables';
 
 import { templateFormSchema } from './templateFormSchema';
+import TemplateEmailPreview from './TemplateEmailPreview';
 import TemplateMarkdownEditor from './TemplateMarkdownEditor';
-import TemplateMarkdownViewer from './TemplateMarkdownViewer';
+import TemplateVariableMenuButton from './TemplateVariableMenuButton';
 import { useTemplateFormSubmit } from './hooks/useTemplateFormSubmit';
+import {
+  DEFAULT_EMAIL_SIGNATURE,
+  composeTemplateBodyWithSignature,
+  splitTemplateBodySections,
+} from './templateBodySections';
+import { insertTemplateVariableAtSelection } from './templatePreviewUtils';
+import type {
+  TemplateVariableInsertionRequest,
+  TemplateVariableTarget,
+} from './templateVariableInsertion';
 
 type TemplateFormScreenProps = {
   mode: 'create' | 'edit';
@@ -23,6 +34,7 @@ type TemplateFormValues = {
   name: string;
   subject: string;
   body: string;
+  signature: string;
   templateType: (typeof ENABLED_EMAIL_TEMPLATE_TYPE_KEYS)[number];
   isArchived: boolean;
 };
@@ -31,11 +43,10 @@ const defaultValues: TemplateFormValues = {
   name: '',
   subject: '',
   body: '',
+  signature: DEFAULT_EMAIL_SIGNATURE,
   templateType: ENABLED_EMAIL_TEMPLATE_TYPE_KEYS[0],
   isArchived: false,
 };
-
-const FIXED_BUSINESS_NAME = 'Refrens Demo';
 
 function getDuplicateValues(template: SerializedMessageTemplate): TemplateFormValues {
   const source =
@@ -45,21 +56,26 @@ function getDuplicateValues(template: SerializedMessageTemplate): TemplateFormVa
           ...template.published,
         }
       : template;
+  const bodySections = splitTemplateBodySections(source.body);
 
   return {
     name: `[DUPLICATE] ${source.name}`,
     subject: source.subject,
-    body: source.body,
+    body: bodySections.body,
+    signature: bodySections.signature,
     templateType: source.templateType,
     isArchived: false,
   };
 }
 
 function getEditValues(template: SerializedMessageTemplate): TemplateFormValues {
+  const bodySections = splitTemplateBodySections(template.body);
+
   return {
     name: template.name,
     subject: template.subject,
-    body: template.body,
+    body: bodySections.body,
+    signature: bodySections.signature,
     templateType: template.templateType,
     isArchived: template.isArchived,
   };
@@ -137,7 +153,25 @@ export default function TemplateFormScreen({
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loadedTemplate, setLoadedTemplate] = useState<SerializedMessageTemplate | null>(null);
   const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
+  const [activeVariableTarget, setActiveVariableTarget] = useState<TemplateVariableTarget | null>(
+    null,
+  );
+  const [pendingBodyVariableInsertion, setPendingBodyVariableInsertion] =
+    useState<TemplateVariableInsertionRequest | null>(null);
   const actionsRef = useRef<HTMLDivElement>(null);
+  const subjectInputRef = useRef<HTMLInputElement>(null);
+  const signatureInputRef = useRef<HTMLTextAreaElement>(null);
+  const variableInsertionRequestIdRef = useRef(0);
+  const subjectSelectionRef = useRef<{ start: number | null; end: number | null }>({
+    start: null,
+    end: null,
+  });
+  const signatureSelectionRef = useRef<{ start: number | null; end: number | null }>({
+    start: null,
+    end: null,
+  });
+  const pendingSubjectSelectionRef = useRef<{ start: number; end: number } | null>(null);
+  const pendingSignatureSelectionRef = useRef<{ start: number; end: number } | null>(null);
 
   const { submitTemplate, submitError, isSubmitting } = useTemplateFormSubmit({
     mode,
@@ -196,13 +230,7 @@ export default function TemplateFormScreen({
     initialValues,
     validationSchema: templateFormSchema,
     onSubmit: async (values) => {
-      await submitTemplate(
-        {
-          ...values,
-          body: removeMarkdownEditorsInternalVariables(values.body),
-        },
-        true,
-      );
+      await submitTemplate(buildTemplatePayload(values), true);
     },
   });
 
@@ -211,8 +239,119 @@ export default function TemplateFormScreen({
     [formik.values.body],
   );
 
+  const buildTemplatePayload = (values: TemplateFormValues): TemplateWritePayload => ({
+    name: values.name,
+    subject: values.subject,
+    body: composeTemplateBodyWithSignature(
+      removeMarkdownEditorsInternalVariables(values.body),
+      values.signature,
+    ),
+    templateType: values.templateType,
+    isArchived: values.isArchived,
+  });
+
+  useEffect(() => {
+    if (!pendingSubjectSelectionRef.current || !subjectInputRef.current) {
+      return;
+    }
+
+    const { start, end } = pendingSubjectSelectionRef.current;
+
+    pendingSubjectSelectionRef.current = null;
+    subjectInputRef.current.focus();
+    subjectInputRef.current.setSelectionRange(start, end);
+    subjectSelectionRef.current = { start, end };
+  }, [formik.values.subject]);
+
+  useEffect(() => {
+    if (!pendingSignatureSelectionRef.current || !signatureInputRef.current) {
+      return;
+    }
+
+    const { start, end } = pendingSignatureSelectionRef.current;
+
+    pendingSignatureSelectionRef.current = null;
+    signatureInputRef.current.focus();
+    signatureInputRef.current.setSelectionRange(start, end);
+    signatureSelectionRef.current = { start, end };
+  }, [formik.values.signature]);
+
   const isPublishDisabled =
     isSubmitting || (!formik.dirty && !(loadedTemplate?.isModifiedPostPublish || false));
+
+  const updateSelection = (
+    element: HTMLInputElement | HTMLTextAreaElement,
+    selectionRef: React.MutableRefObject<{ start: number | null; end: number | null }>,
+  ) => {
+    selectionRef.current = {
+      start: element.selectionStart,
+      end: element.selectionEnd,
+    };
+  };
+
+  const createVariableInsertionRequest = (variableKey: string): TemplateVariableInsertionRequest => {
+    variableInsertionRequestIdRef.current += 1;
+
+    return {
+      id: variableInsertionRequestIdRef.current,
+      variableKey,
+    };
+  };
+
+  const insertSubjectVariable = (variableKey: string) => {
+    const selectionStart =
+      subjectInputRef.current?.selectionStart ?? subjectSelectionRef.current.start;
+    const selectionEnd = subjectInputRef.current?.selectionEnd ?? subjectSelectionRef.current.end;
+    const nextSelection = insertTemplateVariableAtSelection(
+      formik.values.subject,
+      variableKey,
+      selectionStart,
+      selectionEnd,
+    );
+
+    pendingSubjectSelectionRef.current = {
+      start: nextSelection.nextSelectionStart,
+      end: nextSelection.nextSelectionEnd,
+    };
+
+    void formik.setFieldValue('subject', nextSelection.nextValue);
+  };
+
+  const insertSignatureVariable = (variableKey: string) => {
+    const selectionStart =
+      signatureInputRef.current?.selectionStart ?? signatureSelectionRef.current.start;
+    const selectionEnd =
+      signatureInputRef.current?.selectionEnd ?? signatureSelectionRef.current.end;
+    const nextSelection = insertTemplateVariableAtSelection(
+      formik.values.signature,
+      variableKey,
+      selectionStart,
+      selectionEnd,
+    );
+
+    pendingSignatureSelectionRef.current = {
+      start: nextSelection.nextSelectionStart,
+      end: nextSelection.nextSelectionEnd,
+    };
+
+    void formik.setFieldValue('signature', nextSelection.nextValue);
+  };
+
+  const handleVariableInsert = (variableKey: string) => {
+    switch (activeVariableTarget) {
+      case 'body':
+        setPendingBodyVariableInsertion(createVariableInsertionRequest(variableKey));
+        return;
+      case 'signature':
+        insertSignatureVariable(variableKey);
+        return;
+      case 'subject':
+        insertSubjectVariable(variableKey);
+        return;
+      default:
+        return;
+    }
+  };
 
   const handleDraftSave = async () => {
     setIsActionsMenuOpen(false);
@@ -224,18 +363,13 @@ export default function TemplateFormScreen({
         name: true,
         subject: true,
         body: true,
+        signature: true,
         templateType: true,
       });
       return;
     }
 
-    await submitTemplate(
-      {
-        ...formik.values,
-        body: removeMarkdownEditorsInternalVariables(formik.values.body),
-      } as TemplateWritePayload,
-      false,
-    );
+    await submitTemplate(buildTemplatePayload(formik.values), false);
   };
 
   const handlePublish = async () => {
@@ -246,6 +380,7 @@ export default function TemplateFormScreen({
         name: true,
         subject: true,
         body: true,
+        signature: true,
         templateType: true,
       });
       return;
@@ -358,6 +493,15 @@ export default function TemplateFormScreen({
               ) : null}
             </div>
 
+            <div className='template-form-variable-actions'>
+              <TemplateVariableMenuButton
+                buttonLabel='Add variable'
+                buttonAriaLabel='Add variable'
+                disabled={!activeVariableTarget}
+                onSelect={handleVariableInsert}
+              />
+            </div>
+
             <div className='field-group'>
               <label className='field-label' htmlFor='subject'>
                 Email Subject
@@ -367,9 +511,29 @@ export default function TemplateFormScreen({
                 id='subject'
                 name='subject'
                 className='text-input'
+                ref={subjectInputRef}
                 value={formik.values.subject}
-                onChange={formik.handleChange}
+                onChange={(event) => {
+                  setActiveVariableTarget('subject');
+                  formik.handleChange(event);
+                  updateSelection(event.currentTarget, subjectSelectionRef);
+                }}
                 onBlur={formik.handleBlur}
+                onClick={(event) => {
+                  setActiveVariableTarget('subject');
+                  updateSelection(event.currentTarget, subjectSelectionRef);
+                }}
+                onKeyUp={(event) => {
+                  setActiveVariableTarget('subject');
+                  updateSelection(event.currentTarget, subjectSelectionRef);
+                }}
+                onSelect={(event) => {
+                  setActiveVariableTarget('subject');
+                  updateSelection(event.currentTarget, subjectSelectionRef);
+                }}
+                onFocus={() => {
+                  setActiveVariableTarget('subject');
+                }}
                 aria-label='Email Subject'
               />
               {formik.touched.subject && formik.errors.subject ? (
@@ -384,8 +548,52 @@ export default function TemplateFormScreen({
               onChange={(nextValue) => {
                 void formik.setFieldValue('body', nextValue);
               }}
+              onActivate={() => {
+                setActiveVariableTarget('body');
+              }}
+              pendingVariableInsertion={pendingBodyVariableInsertion}
               error={formik.touched.body ? formik.errors.body : undefined}
             />
+
+            <div className='field-group'>
+              <label className='field-label' htmlFor='signature'>
+                Email Signature
+              </label>
+              <p className='helper-text'>
+                This is edited separately here and appended to the saved email body with a plain
+                line break.
+              </p>
+              <textarea
+                id='signature'
+                name='signature'
+                className='textarea-input'
+                rows={4}
+                ref={signatureInputRef}
+                value={formik.values.signature}
+                onChange={(event) => {
+                  setActiveVariableTarget('signature');
+                  formik.handleChange(event);
+                  updateSelection(event.currentTarget, signatureSelectionRef);
+                }}
+                onBlur={formik.handleBlur}
+                onClick={(event) => {
+                  setActiveVariableTarget('signature');
+                  updateSelection(event.currentTarget, signatureSelectionRef);
+                }}
+                onKeyUp={(event) => {
+                  setActiveVariableTarget('signature');
+                  updateSelection(event.currentTarget, signatureSelectionRef);
+                }}
+                onSelect={(event) => {
+                  setActiveVariableTarget('signature');
+                  updateSelection(event.currentTarget, signatureSelectionRef);
+                }}
+                onFocus={() => {
+                  setActiveVariableTarget('signature');
+                }}
+                aria-label='Email Signature'
+              />
+            </div>
 
             {submitError ? <div className='template-inline-error'>{submitError}</div> : null}
           </form>
@@ -393,19 +601,11 @@ export default function TemplateFormScreen({
 
         <aside className='template-preview-panel'>
           <h2 className='template-preview-title'>Email preview</h2>
-          <div className='template-preview-card'>
-            {previewBody ? (
-              <TemplateMarkdownViewer value={previewBody} />
-            ) : (
-              <p className='template-preview-empty'>Start writing to preview this email.</p>
-            )}
-            <div className='template-preview-footer'>
-              <p>
-                <strong>Regards</strong>
-              </p>
-              <p>{FIXED_BUSINESS_NAME}</p>
-            </div>
-          </div>
+          <TemplateEmailPreview
+            subject={formik.values.subject}
+            body={previewBody}
+            signature={formik.values.signature}
+          />
         </aside>
       </div>
     </main>

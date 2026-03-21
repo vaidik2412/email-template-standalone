@@ -30,7 +30,7 @@ describe('TemplateFormScreen in edit mode', () => {
           _id: 'template-1',
           name: 'Existing template',
           subject: 'Original subject',
-          body: 'Hello {{contact.name}}',
+          body: 'Hello {{contact.name}}\n\n\nBest regards,\nStandalone Admin',
           templateType: 'SALES_CRM',
           status: 'LIVE',
           channel: 'EMAIL',
@@ -68,6 +68,12 @@ describe('TemplateFormScreen in edit mode', () => {
       expect(screen.getByDisplayValue('Existing template')).toBeInTheDocument();
     });
 
+    expect(screen.getByText(/standalone admin <standalone@refrens.local>/i)).toBeInTheDocument();
+    expect(screen.getByText(/rahul mehta <rahul@mehtatraders.in>/i)).toBeInTheDocument();
+    expect(screen.getByText('Original subject')).toBeInTheDocument();
+    expect(screen.getByText('Hello Rahul Mehta')).toBeInTheDocument();
+    expect(screen.getByLabelText(/email signature/i)).toHaveValue('Best regards,\nStandalone Admin');
+
     fireEvent.change(screen.getByLabelText(/email subject/i), {
       target: { value: 'Updated subject' },
     });
@@ -81,6 +87,15 @@ describe('TemplateFormScreen in edit mode', () => {
         }),
       );
     });
+
+    const [, requestOptions] = fetchMock.mock.calls.at(-1) as [string, RequestInit];
+    const payload = JSON.parse(String(requestOptions.body)) as {
+      body: string;
+      signature?: string;
+    };
+
+    expect(payload.body).toBe('Hello {{contact.name}}\n\n\nBest regards,\nStandalone Admin');
+    expect(payload).not.toHaveProperty('signature');
 
     expect(push).toHaveBeenCalledWith('/templates');
   });

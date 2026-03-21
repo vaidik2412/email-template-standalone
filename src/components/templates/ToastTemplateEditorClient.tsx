@@ -3,24 +3,33 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { Editor } from '@toast-ui/react-editor';
 import type { EditorProps } from '@toast-ui/react-editor';
+import type { SelectionPos } from '@toast-ui/editor';
 
-import { EMAIL_TEMPLATE_VARIABLE_OPTIONS, EMAIL_TEMPLATE_VARIABLE_KEYS } from '@/data/email/lmsVariables';
+import { EMAIL_TEMPLATE_VARIABLE_KEYS } from '@/data/email/lmsVariables';
+
+import { getTemplateVariableToken } from './templatePreviewUtils';
+import type { TemplateVariableInsertionRequest } from './templateVariableInsertion';
 
 type ToastTemplateEditorClientProps = {
   value: string;
   onChange: (value: string) => void;
+  onActivate?: () => void;
+  pendingVariableInsertion?: TemplateVariableInsertionRequest | null;
 };
 
 const VARIABLE_PATTERN = /\{\{[^}]+\.[^}]+\}\}/;
 
 type WidgetRule = NonNullable<EditorProps['widgetRules']>[number];
-type ToolbarItemOptions = Exclude<NonNullable<EditorProps['toolbarItems']>[number][number], string>;
 
 export default function ToastTemplateEditorClient({
   value,
   onChange,
+  onActivate,
+  pendingVariableInsertion = null,
 }: ToastTemplateEditorClientProps) {
   const editorRef = useRef<Editor>(null);
+  const selectionRef = useRef<SelectionPos | null>(null);
+  const lastHandledInsertionRequestIdRef = useRef<number | null>(null);
 
   useEffect(() => {
     const editor = editorRef.current?.getInstance();
@@ -36,40 +45,35 @@ export default function ToastTemplateEditorClient({
     }
   }, [value]);
 
-  const addVariableToolbarItem = useMemo<ToolbarItemOptions | null>(() => {
-    if (typeof document === 'undefined') {
-      return null;
+  useEffect(() => {
+    if (
+      !pendingVariableInsertion ||
+      lastHandledInsertionRequestIdRef.current === pendingVariableInsertion.id
+    ) {
+      return;
     }
 
-    const toolbarButton = document.createElement('div');
-    toolbarButton.className = 'editor-toolbar-btn';
-    toolbarButton.innerHTML =
-      "<span class='template-toolbar-button-plus'>+</span>Add variable";
+    lastHandledInsertionRequestIdRef.current = pendingVariableInsertion.id;
 
-    const popupBody = document.createElement('div');
-    popupBody.className = 'template-variable-popup';
+    const editor = editorRef.current?.getInstance();
 
-    EMAIL_TEMPLATE_VARIABLE_OPTIONS.forEach((option) => {
-      const optionButton = document.createElement('button');
-      optionButton.type = 'button';
-      optionButton.className = 'template-variable-popup-item';
-      optionButton.textContent = option.label;
-      optionButton.onclick = () => {
-        editorRef.current?.getInstance().insertText(`{{${option.value}}}`);
-      };
-      popupBody.appendChild(optionButton);
-    });
+    if (!editor) {
+      return;
+    }
 
-    return {
-      name: 'Add variable',
-      text: 'Add variable +',
-      tooltip: 'Add variable',
-      el: toolbarButton,
-      popup: {
-        body: popupBody,
-      },
-    };
-  }, []);
+    editor.focus();
+
+    if (selectionRef.current) {
+      const [start, end] = selectionRef.current as [SelectionPos[0], SelectionPos[1]];
+
+      editor.setSelection(start, end);
+    } else {
+      editor.moveCursorToEnd(true);
+    }
+
+    editor.insertText(getTemplateVariableToken(pendingVariableInsertion.variableKey));
+    selectionRef.current = editor.getSelection();
+  }, [pendingVariableInsertion]);
 
   const widgetRules = useMemo<WidgetRule[]>(
     () => [
@@ -98,10 +102,20 @@ export default function ToastTemplateEditorClient({
       ['hr', 'quote'],
       ['ul', 'ol', 'task', 'indent', 'outdent'],
       ['code'],
-      addVariableToolbarItem ? [addVariableToolbarItem] : [],
     ],
-    [addVariableToolbarItem],
+    [],
   );
+
+  const syncSelection = () => {
+    const editor = editorRef.current?.getInstance();
+
+    if (!editor) {
+      return;
+    }
+
+    selectionRef.current = editor.getSelection();
+    onActivate?.();
+  };
 
   return (
     <div className='template-editor-shell'>
@@ -118,6 +132,24 @@ export default function ToastTemplateEditorClient({
         usageStatistics={false}
         autofocus={false}
         widgetRules={widgetRules}
+        onFocus={() => {
+          syncSelection();
+        }}
+        onBlur={() => {
+          const editor = editorRef.current?.getInstance();
+
+          if (!editor) {
+            return;
+          }
+
+          selectionRef.current = editor.getSelection();
+        }}
+        onCaretChange={() => {
+          syncSelection();
+        }}
+        onKeyup={() => {
+          syncSelection();
+        }}
         onChange={() => {
           onChange(editorRef.current?.getInstance().getMarkdown() || '');
         }}

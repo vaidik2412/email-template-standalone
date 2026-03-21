@@ -73,6 +73,29 @@ describe('templates API routes', () => {
     );
   });
 
+  it('returns a JSON error payload when create fails unexpectedly', async () => {
+    vi.mocked(createTemplate).mockRejectedValue(new Error('MONGODB_URI is required'));
+
+    const response = await postTemplate(
+      new Request('http://localhost/api/templates?isPublished=true', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: 'New template',
+          subject: 'Hello',
+          body: 'World',
+        }),
+        headers: {
+          'content-type': 'application/json',
+        },
+      }),
+    );
+
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({
+      message: 'MONGODB_URI is required',
+    });
+  });
+
   it('gets one template by id', async () => {
     vi.mocked(getTemplateById).mockResolvedValue({
       _id: 'template-3',
@@ -136,5 +159,33 @@ describe('templates API routes', () => {
         isPublished: true,
       },
     );
+  });
+
+  it('returns a JSON error payload when patch fails unexpectedly', async () => {
+    vi.mocked(updateTemplate).mockRejectedValue(new Error('MONGODB_URI is required'));
+
+    const response = await patchTemplate(
+      new Request('http://localhost/api/templates/template-4?isPublished=true', {
+        method: 'PATCH',
+        body: JSON.stringify({
+          name: 'Published template',
+          subject: 'Updated',
+          body: 'Updated body',
+        }),
+        headers: {
+          'content-type': 'application/json',
+        },
+      }),
+      {
+        params: Promise.resolve({
+          id: 'template-4',
+        }),
+      },
+    );
+
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({
+      message: 'MONGODB_URI is required',
+    });
   });
 });
