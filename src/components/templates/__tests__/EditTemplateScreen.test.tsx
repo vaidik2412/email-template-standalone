@@ -99,4 +99,79 @@ describe('TemplateFormScreen in edit mode', () => {
 
     expect(push).toHaveBeenCalledWith('/templates');
   });
+
+  it('loads an existing whatsapp template with a read-only channel field', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          _id: 'template-whatsapp',
+          name: 'WhatsApp reminder',
+          subject: '',
+          body: 'Hello {{contact.name}}',
+          templateType: 'SALES_CRM',
+          status: 'DRAFT',
+          channel: 'WHATSAPP',
+          isModifiedPostPublish: false,
+          isDefault: false,
+          isArchived: false,
+          isRemoved: false,
+          createdAt: '2026-03-21T00:00:00.000Z',
+          updatedAt: '2026-03-21T00:00:00.000Z',
+          business: {
+            _id: 'business-1',
+            urlKey: 'demo-business',
+            name: 'Refrens Demo Business',
+          },
+          createdBy: {
+            _id: 'user-1',
+            name: 'Standalone Admin',
+          },
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          _id: 'template-whatsapp',
+        }),
+      });
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<TemplateFormScreen mode='edit' templateId='template-whatsapp' />);
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('WhatsApp reminder')).toBeInTheDocument();
+    });
+
+    expect(screen.getByLabelText(/channel/i)).toBeDisabled();
+    expect(screen.queryByLabelText(/email subject/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/email signature/i)).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/whatsapp message/i)).toHaveValue('Hello {{contact.name}}');
+    expect(screen.getByText(/whatsapp preview/i)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText(/whatsapp message/i), {
+      target: { value: 'Updated {{contact.name}}' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /publish template/i }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/templates/template-whatsapp?isPublished=true',
+        expect.objectContaining({
+          method: 'PATCH',
+        }),
+      );
+    });
+
+    const [, requestOptions] = fetchMock.mock.calls.at(-1) as [string, RequestInit];
+    const payload = JSON.parse(String(requestOptions.body)) as Record<string, unknown>;
+
+    expect(payload).toMatchObject({
+      channel: 'WHATSAPP',
+      body: 'Updated {{contact.name}}',
+    });
+    expect(payload).not.toHaveProperty('subject');
+  });
 });

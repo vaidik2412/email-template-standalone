@@ -19,6 +19,7 @@ describe('TemplatesDashboard', () => {
             {
               _id: 'template-1',
               name: 'Lead Follow-up Email',
+              channel: 'EMAIL',
               templateType: 'SALES_CRM',
               status: 'LIVE',
               isArchived: false,
@@ -31,8 +32,24 @@ describe('TemplatesDashboard', () => {
               createdAt: '2026-03-21T00:00:00.000Z',
               updatedAt: '2026-03-21T00:00:00.000Z',
             },
+            {
+              _id: 'template-2',
+              name: 'Payment Reminder',
+              channel: 'WHATSAPP',
+              templateType: 'ACCOUNTING_DOCUMENTS',
+              status: 'DRAFT',
+              isArchived: false,
+              isModifiedPostPublish: true,
+              subject: '',
+              createdBy: {
+                _id: 'user-1',
+                name: 'Standalone Admin',
+              },
+              createdAt: '2026-03-22T00:00:00.000Z',
+              updatedAt: '2026-03-22T00:00:00.000Z',
+            },
           ],
-          total: 1,
+          total: 2,
           limit: 10,
           skip: 0,
         }),
@@ -41,7 +58,7 @@ describe('TemplatesDashboard', () => {
 
     render(<TemplatesDashboard />);
 
-    expect(screen.getByRole('heading', { name: /email templates/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /message templates/i })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /create new template/i })).toHaveAttribute(
       'href',
       '/templates/new',
@@ -53,5 +70,9 @@ describe('TemplatesDashboard', () => {
 
     expect(screen.getByText('Sales CRM')).toBeInTheDocument();
     expect(screen.getByText('Following up on your requirement')).toBeInTheDocument();
+    expect(screen.getByText('Email')).toBeInTheDocument();
+    expect(screen.getByText('WhatsApp')).toBeInTheDocument();
+    expect(screen.getByText('Payment Reminder')).toBeInTheDocument();
+    expect(screen.getByText(/not used for whatsapp/i)).toBeInTheDocument();
   });
 });

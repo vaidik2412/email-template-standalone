@@ -25,7 +25,9 @@ import { getTemplateVariableToken } from './templatePreviewUtils';
 import { templateFormSchema } from './templateFormSchema';
 import TemplateEmailPreview from './TemplateEmailPreview';
 import TemplateMarkdownEditor from './TemplateMarkdownEditor';
+import TemplatePlainTextEditor from './TemplatePlainTextEditor';
 import TemplateVariableMenuButton from './TemplateVariableMenuButton';
+import TemplateWhatsappPreview from './TemplateWhatsappPreview';
 import { useTemplateFormSubmit } from './hooks/useTemplateFormSubmit';
 import {
   DEFAULT_EMAIL_SIGNATURE,
@@ -46,6 +48,7 @@ type TemplateFormScreenProps = {
 };
 
 type TemplateFormValues = {
+  channel: SerializedMessageTemplate['channel'];
   name: string;
   subject: string;
   body: string;
@@ -56,6 +59,7 @@ type TemplateFormValues = {
 };
 
 const defaultValues: TemplateFormValues = {
+  channel: 'EMAIL',
   name: '',
   subject: '',
   body: '',
@@ -73,11 +77,18 @@ function getDuplicateValues(template: SerializedMessageTemplate): TemplateFormVa
           ...template.published,
         }
       : template;
-  const bodySections = splitTemplateBodySections(source.body);
+  const bodySections =
+    source.channel === 'WHATSAPP'
+      ? {
+          body: source.body,
+          signature: DEFAULT_EMAIL_SIGNATURE,
+        }
+      : splitTemplateBodySections(source.body);
 
   return {
+    channel: source.channel,
     name: `[DUPLICATE] ${source.name}`,
-    subject: source.subject,
+    subject: source.subject || '',
     body: bodySections.body,
     signature: bodySections.signature,
     templateType: source.templateType,
@@ -87,11 +98,18 @@ function getDuplicateValues(template: SerializedMessageTemplate): TemplateFormVa
 }
 
 function getEditValues(template: SerializedMessageTemplate): TemplateFormValues {
-  const bodySections = splitTemplateBodySections(template.body);
+  const bodySections =
+    template.channel === 'WHATSAPP'
+      ? {
+          body: template.body,
+          signature: DEFAULT_EMAIL_SIGNATURE,
+        }
+      : splitTemplateBodySections(template.body);
 
   return {
+    channel: template.channel,
     name: template.name,
-    subject: template.subject,
+    subject: template.subject || '',
     body: bodySections.body,
     signature: bodySections.signature,
     templateType: template.templateType,
@@ -107,7 +125,7 @@ function TemplateBreadcrumbs() {
       <span className='template-breadcrumb-separator'>›</span>
       <span>Business Settings</span>
       <span className='template-breadcrumb-separator'>›</span>
-      <span>Email Templates</span>
+      <span>Message Templates</span>
     </nav>
   );
 }
@@ -258,16 +276,20 @@ export default function TemplateFormScreen({
         indexedCustomFields,
       }).options.map((option) => option.value);
 
-      const subjectError = getTemplateFieldValidationError({
-        fieldKind: 'subject',
-        value: values.subject,
-        allowedVariableKeys,
-      });
-      if (subjectError) {
-        errors.subject = subjectError;
+      if (values.channel === 'EMAIL') {
+        const subjectError = getTemplateFieldValidationError({
+          channel: values.channel,
+          fieldKind: 'subject',
+          value: values.subject,
+          allowedVariableKeys,
+        });
+        if (subjectError) {
+          errors.subject = subjectError;
+        }
       }
 
       const bodyError = getTemplateFieldValidationError({
+        channel: values.channel,
         fieldKind: 'body',
         value: values.body,
         allowedVariableKeys,
@@ -276,13 +298,16 @@ export default function TemplateFormScreen({
         errors.body = bodyError;
       }
 
-      const signatureError = getTemplateFieldValidationError({
-        fieldKind: 'signature',
-        value: values.signature,
-        allowedVariableKeys,
-      });
-      if (signatureError) {
-        errors.signature = signatureError;
+      if (values.channel === 'EMAIL') {
+        const signatureError = getTemplateFieldValidationError({
+          channel: values.channel,
+          fieldKind: 'signature',
+          value: values.signature,
+          allowedVariableKeys,
+        });
+        if (signatureError) {
+          errors.signature = signatureError;
+        }
       }
 
       return errors;
@@ -309,18 +334,40 @@ export default function TemplateFormScreen({
     [formik.values.body],
   );
 
-  const buildTemplatePayload = (values: TemplateFormValues): TemplateWritePayload => ({
-    name: values.name,
-    subject: values.subject,
-    body: composeTemplateBodyWithSignature(
-      removeMarkdownEditorsInternalVariables(values.body),
-      values.signature,
-    ),
-    templateType: values.templateType,
-    documentSubtype:
-      values.templateType === 'ACCOUNTING_DOCUMENTS' ? values.documentSubtype || undefined : undefined,
-    isArchived: values.isArchived,
-  });
+  const buildTemplatePayload = (values: TemplateFormValues): TemplateWritePayload => {
+    const normalizedBody = removeMarkdownEditorsInternalVariables(values.body);
+
+    if (values.channel === 'WHATSAPP') {
+      return {
+        channel: values.channel,
+        name: values.name,
+        body: normalizedBody,
+        templateType: values.templateType,
+        documentSubtype:
+          values.templateType === 'ACCOUNTING_DOCUMENTS'
+            ? values.documentSubtype || undefined
+            : undefined,
+        isArchived: values.isArchived,
+      };
+    }
+
+    return {
+      channel: values.channel,
+      name: values.name,
+      subject: values.subject,
+      body: composeTemplateBodyWithSignature(normalizedBody, values.signature),
+      templateType: values.templateType,
+      documentSubtype:
+        values.templateType === 'ACCOUNTING_DOCUMENTS'
+          ? values.documentSubtype || undefined
+          : undefined,
+      isArchived: values.isArchived,
+    };
+  };
+
+  useEffect(() => {
+    setActiveVariableTarget(formik.values.channel === 'WHATSAPP' ? 'body' : 'subject');
+  }, [formik.values.channel]);
 
   useEffect(() => {
     if (!pendingSubjectSelectionRef.current || !subjectInputRef.current) {
@@ -455,10 +502,11 @@ export default function TemplateFormScreen({
 
     if (Object.keys(errors).length) {
       formik.setTouched({
+        channel: true,
         name: true,
-        subject: true,
+        subject: formik.values.channel === 'EMAIL',
         body: true,
-        signature: true,
+        signature: formik.values.channel === 'EMAIL',
         templateType: true,
         documentSubtype: formik.values.templateType === 'ACCOUNTING_DOCUMENTS',
       });
@@ -473,10 +521,11 @@ export default function TemplateFormScreen({
 
     if (Object.keys(errors).length) {
       formik.setTouched({
+        channel: true,
         name: true,
-        subject: true,
+        subject: formik.values.channel === 'EMAIL',
         body: true,
-        signature: true,
+        signature: formik.values.channel === 'EMAIL',
         templateType: true,
         documentSubtype: formik.values.templateType === 'ACCOUNTING_DOCUMENTS',
       });
@@ -544,6 +593,34 @@ export default function TemplateFormScreen({
       <div className='template-content-grid template-content-grid--with-preview'>
         <section className='template-form-card'>
           <form id='template-form' className='template-form-stack' onSubmit={formik.handleSubmit}>
+            <div className='field-group'>
+              <label className='field-label' htmlFor='channel'>
+                Channel
+                <span>*</span>
+              </label>
+              <p className='helper-text'>Pick the delivery channel for this template.</p>
+              <select
+                id='channel'
+                name='channel'
+                className='select-input'
+                value={formik.values.channel}
+                disabled={mode === 'edit'}
+                onChange={(event) => {
+                  const nextChannel = event.target.value as TemplateFormValues['channel'];
+
+                  void formik.setFieldValue('channel', nextChannel);
+                }}
+                onBlur={formik.handleBlur}
+                aria-label='Channel'
+              >
+                <option value='EMAIL'>Email</option>
+                <option value='WHATSAPP'>WhatsApp</option>
+              </select>
+              {formik.touched.channel && formik.errors.channel ? (
+                <div className='field-error'>{formik.errors.channel}</div>
+              ) : null}
+            </div>
+
             <div className='field-group'>
               <label className='field-label' htmlFor='templateType'>
                 Category
@@ -637,112 +714,139 @@ export default function TemplateFormScreen({
               />
             </div>
 
-            <div className='field-group'>
-              <label className='field-label' htmlFor='subject'>
-                Email Subject
-                <span>*</span>
-              </label>
-              <input
-                id='subject'
-                name='subject'
-                className='text-input'
-                ref={subjectInputRef}
-                value={formik.values.subject}
-                onChange={(event) => {
-                  setActiveVariableTarget('subject');
-                  formik.handleChange(event);
-                  updateSelection(event.currentTarget, subjectSelectionRef);
-                }}
-                onBlur={formik.handleBlur}
-                onClick={(event) => {
-                  setActiveVariableTarget('subject');
-                  updateSelection(event.currentTarget, subjectSelectionRef);
-                }}
-                onKeyUp={(event) => {
-                  setActiveVariableTarget('subject');
-                  updateSelection(event.currentTarget, subjectSelectionRef);
-                }}
-                onSelect={(event) => {
-                  setActiveVariableTarget('subject');
-                  updateSelection(event.currentTarget, subjectSelectionRef);
-                }}
-                onFocus={() => {
-                  setActiveVariableTarget('subject');
-                }}
-                aria-label='Email Subject'
-              />
-              {formik.touched.subject && formik.errors.subject ? (
-                <div className='field-error'>{formik.errors.subject}</div>
-              ) : null}
-            </div>
+            {formik.values.channel === 'EMAIL' ? (
+              <>
+                <div className='field-group'>
+                  <label className='field-label' htmlFor='subject'>
+                    Email Subject
+                    <span>*</span>
+                  </label>
+                  <input
+                    id='subject'
+                    name='subject'
+                    className='text-input'
+                    ref={subjectInputRef}
+                    value={formik.values.subject}
+                    onChange={(event) => {
+                      setActiveVariableTarget('subject');
+                      formik.handleChange(event);
+                      updateSelection(event.currentTarget, subjectSelectionRef);
+                    }}
+                    onBlur={formik.handleBlur}
+                    onClick={(event) => {
+                      setActiveVariableTarget('subject');
+                      updateSelection(event.currentTarget, subjectSelectionRef);
+                    }}
+                    onKeyUp={(event) => {
+                      setActiveVariableTarget('subject');
+                      updateSelection(event.currentTarget, subjectSelectionRef);
+                    }}
+                    onSelect={(event) => {
+                      setActiveVariableTarget('subject');
+                      updateSelection(event.currentTarget, subjectSelectionRef);
+                    }}
+                    onFocus={() => {
+                      setActiveVariableTarget('subject');
+                    }}
+                    aria-label='Email Subject'
+                  />
+                  {formik.touched.subject && formik.errors.subject ? (
+                    <div className='field-error'>{formik.errors.subject}</div>
+                  ) : null}
+                </div>
 
-            <TemplateMarkdownEditor
-              id='body'
-              label='Email Body'
-              value={formik.values.body}
-              onChange={(nextValue) => {
-                void formik.setFieldValue('body', nextValue);
-              }}
-              onActivate={() => {
-                setActiveVariableTarget('body');
-              }}
-              pendingVariableInsertion={pendingBodyVariableInsertion}
-              error={formik.touched.body ? formik.errors.body : undefined}
-            />
+                <TemplateMarkdownEditor
+                  id='body'
+                  label='Email Body'
+                  value={formik.values.body}
+                  onChange={(nextValue) => {
+                    void formik.setFieldValue('body', nextValue);
+                  }}
+                  onActivate={() => {
+                    setActiveVariableTarget('body');
+                  }}
+                  pendingVariableInsertion={pendingBodyVariableInsertion}
+                  error={formik.touched.body ? formik.errors.body : undefined}
+                />
 
-            <div className='field-group'>
-              <label className='field-label' htmlFor='signature'>
-                Email Signature
-              </label>
-              <p className='helper-text'>
-                This is edited separately here and appended to the saved email body with a plain
-                line break.
-              </p>
-              <textarea
-                id='signature'
-                name='signature'
-                className='textarea-input'
-                rows={4}
-                ref={signatureInputRef}
-                value={formik.values.signature}
-                onChange={(event) => {
-                  setActiveVariableTarget('signature');
-                  formik.handleChange(event);
-                  updateSelection(event.currentTarget, signatureSelectionRef);
+                <div className='field-group'>
+                  <label className='field-label' htmlFor='signature'>
+                    Email Signature
+                  </label>
+                  <p className='helper-text'>
+                    This is edited separately here and appended to the saved email body with a
+                    plain line break.
+                  </p>
+                  <textarea
+                    id='signature'
+                    name='signature'
+                    className='textarea-input'
+                    rows={4}
+                    ref={signatureInputRef}
+                    value={formik.values.signature}
+                    onChange={(event) => {
+                      setActiveVariableTarget('signature');
+                      formik.handleChange(event);
+                      updateSelection(event.currentTarget, signatureSelectionRef);
+                    }}
+                    onBlur={formik.handleBlur}
+                    onClick={(event) => {
+                      setActiveVariableTarget('signature');
+                      updateSelection(event.currentTarget, signatureSelectionRef);
+                    }}
+                    onKeyUp={(event) => {
+                      setActiveVariableTarget('signature');
+                      updateSelection(event.currentTarget, signatureSelectionRef);
+                    }}
+                    onSelect={(event) => {
+                      setActiveVariableTarget('signature');
+                      updateSelection(event.currentTarget, signatureSelectionRef);
+                    }}
+                    onFocus={() => {
+                      setActiveVariableTarget('signature');
+                    }}
+                    aria-label='Email Signature'
+                  />
+                </div>
+              </>
+            ) : (
+              <TemplatePlainTextEditor
+                id='body'
+                label='WhatsApp Message'
+                value={formik.values.body}
+                maxLength={1024}
+                helperText='Compose the approved-template body as plain text with Refrens variables.'
+                onChange={(nextValue) => {
+                  void formik.setFieldValue('body', nextValue);
                 }}
-                onBlur={formik.handleBlur}
-                onClick={(event) => {
-                  setActiveVariableTarget('signature');
-                  updateSelection(event.currentTarget, signatureSelectionRef);
+                onActivate={() => {
+                  setActiveVariableTarget('body');
                 }}
-                onKeyUp={(event) => {
-                  setActiveVariableTarget('signature');
-                  updateSelection(event.currentTarget, signatureSelectionRef);
-                }}
-                onSelect={(event) => {
-                  setActiveVariableTarget('signature');
-                  updateSelection(event.currentTarget, signatureSelectionRef);
-                }}
-                onFocus={() => {
-                  setActiveVariableTarget('signature');
-                }}
-                aria-label='Email Signature'
+                pendingVariableInsertion={pendingBodyVariableInsertion}
+                error={formik.touched.body ? formik.errors.body : undefined}
               />
-            </div>
+            )}
 
             {submitError ? <div className='template-inline-error'>{submitError}</div> : null}
           </form>
         </section>
 
         <aside className='template-preview-panel'>
-          <h2 className='template-preview-title'>Email preview</h2>
-          <TemplateEmailPreview
-            templateType={formik.values.templateType}
-            subject={formik.values.subject}
-            body={previewBody}
-            signature={formik.values.signature}
-            variableOptions={variableCatalog.options}
-          />
+          {formik.values.channel === 'WHATSAPP' ? (
+            <TemplateWhatsappPreview
+              templateType={formik.values.templateType}
+              body={previewBody}
+              variableOptions={variableCatalog.options}
+            />
+          ) : (
+            <TemplateEmailPreview
+              templateType={formik.values.templateType}
+              subject={formik.values.subject}
+              body={previewBody}
+              signature={formik.values.signature}
+              variableOptions={variableCatalog.options}
+            />
+          )}
         </aside>
       </div>
     </main>

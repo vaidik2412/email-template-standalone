@@ -4,8 +4,13 @@ import { ACCOUNTING_DOCUMENT_SUBTYPE_KEYS } from '@/data/email/documentSubtypes'
 import { ENABLED_EMAIL_TEMPLATE_TYPE_KEYS } from '@/data/email/templateTypes';
 
 export const templateFormSchema = object({
+  channel: string().oneOf(['EMAIL', 'WHATSAPP']).required('Channel is required').default('EMAIL'),
   name: string().required('Template name is required').trim().default(''),
-  subject: string().required('Subject is required').trim().default(''),
+  subject: string().when('channel', {
+    is: 'EMAIL',
+    then: (schema) => schema.required('Subject is required').trim().default(''),
+    otherwise: (schema) => schema.trim().default('').notRequired(),
+  }),
   templateType: string()
     .oneOf(ENABLED_EMAIL_TEMPLATE_TYPE_KEYS)
     .required('Category is required'),

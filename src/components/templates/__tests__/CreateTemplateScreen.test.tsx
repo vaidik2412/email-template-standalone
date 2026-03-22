@@ -34,7 +34,7 @@ describe('TemplateFormScreen in create mode', () => {
 
     expect(screen.getByText('Dashboard')).toBeInTheDocument();
     expect(screen.getByText('Business Settings')).toBeInTheDocument();
-    expect(screen.getByText('Email Templates')).toBeInTheDocument();
+    expect(screen.getByText('Message Templates')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /create new template/i })).toBeInTheDocument();
     expect(screen.getByLabelText(/category/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/template name/i)).toBeInTheDocument();
@@ -338,6 +338,59 @@ describe('TemplateFormScreen in create mode', () => {
     expect(await screen.findByRole('button', { name: /document number/i })).toBeInTheDocument();
     expect(await screen.findByRole('button', { name: /document sharelink/i })).toBeInTheDocument();
     expect(await screen.findByRole('button', { name: /invoice owner/i })).toBeInTheDocument();
+  });
+
+  it('switches into whatsapp authoring mode and submits a whatsapp payload', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        _id: 'template-whatsapp',
+      }),
+    });
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<TemplateFormScreen mode='create' />);
+
+    fireEvent.change(screen.getByLabelText(/channel/i), {
+      target: { value: 'WHATSAPP' },
+    });
+
+    const messageField = await screen.findByLabelText(/whatsapp message/i);
+
+    expect(screen.queryByLabelText(/email subject/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/email signature/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /insert button/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/whatsapp preview/i)).toBeInTheDocument();
+    expect(screen.getByText(/0\s*\/\s*1024/i)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText(/template name/i), {
+      target: { value: 'WhatsApp reminder' },
+    });
+    fireEvent.change(messageField, {
+      target: { value: 'Hello {{contact.name}}' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /publish template/i }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/templates?isPublished=true',
+        expect.objectContaining({
+          method: 'POST',
+        }),
+      );
+    });
+
+    const [, requestOptions] = fetchMock.mock.calls.at(-1) as [string, RequestInit];
+    const payload = JSON.parse(String(requestOptions.body)) as Record<string, unknown>;
+
+    expect(payload).toMatchObject({
+      channel: 'WHATSAPP',
+      name: 'WhatsApp reminder',
+      body: 'Hello {{contact.name}}',
+      templateType: 'SALES_CRM',
+    });
+    expect(payload).not.toHaveProperty('subject');
   });
 
   it('inserts a document sharelink as a subtype-specific CTA in the body', async () => {

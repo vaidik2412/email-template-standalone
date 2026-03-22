@@ -26,6 +26,10 @@ function renderStatus(template: SerializedMessageTemplate) {
   return template.status;
 }
 
+function renderChannelLabel(channel: SerializedMessageTemplate['channel']) {
+  return channel === 'WHATSAPP' ? 'WhatsApp' : 'Email';
+}
+
 export default function TemplatesDashboard() {
   const { templates, isLoading, error, activeTemplateId, patchTemplate } = useTemplates();
 
@@ -41,11 +45,11 @@ export default function TemplatesDashboard() {
     <main className='dashboard-shell'>
       <section className='dashboard-hero'>
         <div>
-          <p className='eyebrow'>Settings / Emails</p>
-          <h1>Email templates</h1>
+          <p className='eyebrow'>Settings / Templates</p>
+          <h1>Message templates</h1>
           <p className='hero-copy'>
-            Manage the custom email templates your single demo business can draft, publish, archive,
-            duplicate, and remove.
+            Manage the email and WhatsApp templates your single demo business can draft, publish,
+            archive, duplicate, and remove.
           </p>
         </div>
         <Link href='/templates/new' className='primary-cta'>
@@ -77,6 +81,7 @@ export default function TemplatesDashboard() {
               <thead>
                 <tr>
                   <th>Template Name</th>
+                  <th>Channel</th>
                   <th>Category</th>
                   <th>Status</th>
                   <th>Created By</th>
@@ -90,11 +95,18 @@ export default function TemplatesDashboard() {
                 {templates.map((template) => (
                   <tr key={template._id}>
                     <td>{template.name}</td>
+                    <td>
+                      <span
+                        className={`template-channel-badge template-channel-badge--${template.channel.toLowerCase()}`}
+                      >
+                        {renderChannelLabel(template.channel)}
+                      </span>
+                    </td>
                     <td>{EMAIL_TEMPLATE_TYPES[template.templateType]?.label || template.templateType}</td>
                     <td>{renderStatus(template)}</td>
                     <td>{template.createdBy?.name || 'Default'}</td>
                     <td>{template.isModifiedPostPublish ? 'Yes' : 'No'}</td>
-                    <td>{template.subject}</td>
+                    <td>{template.channel === 'WHATSAPP' ? 'Not used for WhatsApp' : template.subject}</td>
                     <td>{formatDate(template.createdAt)}</td>
                     <td>
                       <div className='table-actions'>
