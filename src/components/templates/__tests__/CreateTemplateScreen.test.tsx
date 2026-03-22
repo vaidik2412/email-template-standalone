@@ -393,6 +393,44 @@ describe('TemplateFormScreen in create mode', () => {
     expect(payload).not.toHaveProperty('subject');
   });
 
+  it('inserts document share links as plain variables in whatsapp mode', async () => {
+    render(<TemplateFormScreen mode='create' />);
+
+    fireEvent.change(screen.getByLabelText(/channel/i), {
+      target: { value: 'WHATSAPP' },
+    });
+    fireEvent.change(screen.getByLabelText(/category/i), {
+      target: { value: 'ACCOUNTING_DOCUMENTS' },
+    });
+    fireEvent.change(await screen.findByLabelText(/document subtype/i), {
+      target: { value: 'INVOICE' },
+    });
+
+    const messageField = screen.getByLabelText(/whatsapp message/i) as HTMLTextAreaElement;
+
+    await act(async () => {
+      fireEvent.change(messageField, {
+        target: { value: 'Hi there\n\n' },
+      });
+
+      messageField.focus();
+      messageField.setSelectionRange(messageField.value.length, messageField.value.length);
+      fireEvent.select(messageField);
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /^add variable$/i }));
+    });
+
+    await act(async () => {
+      fireEvent.click(await screen.findByRole('button', { name: /document sharelink/i }));
+    });
+
+    await waitFor(() => {
+      expect(messageField).toHaveValue('Hi there\n\n{{document.share_link}}');
+    });
+  });
+
   it('inserts a document sharelink as a subtype-specific CTA in the body', async () => {
     render(<TemplateFormScreen mode='create' />);
 

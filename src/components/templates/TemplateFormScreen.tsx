@@ -458,6 +458,14 @@ export default function TemplateFormScreen({
 
   const handleVariableInsert = (option: TemplateVariableOption) => {
     if (option.insertBehavior === 'documentShareLinkCta') {
+      if (formik.values.channel === 'WHATSAPP') {
+        setActiveVariableTarget('body');
+        setPendingBodyVariableInsertion(
+          createVariableInsertionRequest(getTemplateVariableToken(option.value)),
+        );
+        return;
+      }
+
       const ctaLabel = getDocumentShareLinkCtaLabel(
         formik.values.templateType === 'ACCOUNTING_DOCUMENTS'
           ? formik.values.documentSubtype || undefined
@@ -815,7 +823,7 @@ export default function TemplateFormScreen({
                 label='WhatsApp Message'
                 value={formik.values.body}
                 maxLength={1024}
-                helperText='Compose the approved-template body as plain text with Refrens variables.'
+                helperText='Compose a plain-text WhatsApp template with variables and direct links. Buttons and media stay out of scope in this step.'
                 onChange={(nextValue) => {
                   void formik.setFieldValue('body', nextValue);
                 }}

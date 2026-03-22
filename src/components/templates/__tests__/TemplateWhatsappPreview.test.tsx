@@ -13,6 +13,13 @@ describe('TemplateWhatsappPreview', () => {
       scope: 'SALES_CRM' as const,
       sampleValue: 'Rahul Mehta',
     },
+    {
+      label: 'Document Sharelink',
+      value: 'document.share_link',
+      group: 'Document',
+      scope: 'ACCOUNTING_DOCUMENTS' as const,
+      sampleValue: 'https://share.refrens.local/invoices/INV-2026-001',
+    },
   ];
 
   it('renders resolved variables inside the whatsapp message bubble', () => {
@@ -38,5 +45,38 @@ describe('TemplateWhatsappPreview', () => {
     );
 
     expect(screen.getByText(/start writing to preview this whatsapp message/i)).toBeInTheDocument();
+  });
+
+  it('renders plain share links as tappable link cards', () => {
+    render(
+      <TemplateWhatsappPreview
+        templateType='ACCOUNTING_DOCUMENTS'
+        body='Please review your invoice\n{{document.share_link}}'
+        variableOptions={variableOptions}
+      />,
+    );
+
+    expect(
+      screen.getByRole('link', {
+        name: /share\.refrens\.local\/invoices\/inv-2026-001/i,
+      }),
+    ).toHaveAttribute('href', 'https://share.refrens.local/invoices/INV-2026-001');
+  });
+
+  it('surfaces unsupported email CTA tokens with a whatsapp-specific hint', () => {
+    render(
+      <TemplateWhatsappPreview
+        templateType='ACCOUNTING_DOCUMENTS'
+        body={
+          'Please review your invoice\n\n{{cta label="View Document" url="{{document.share_link}}" bg="#4f46e5" text="#ffffff"}}'
+        }
+        variableOptions={variableOptions}
+      />,
+    );
+
+    expect(
+      screen.getByText(/buttons aren't supported in whatsapp templates yet/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/replace this with \{\{document\.share_link\}\}/i)).toBeInTheDocument();
   });
 });
