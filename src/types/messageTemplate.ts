@@ -46,6 +46,7 @@ export type SerializedMessageTemplate = {
 };
 
 export type TemplateWritePayload = {
+  channel?: 'EMAIL' | 'WHATSAPP';
   name?: string;
   subject?: string;
   body?: string;

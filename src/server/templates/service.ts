@@ -21,6 +21,10 @@ const DEFAULT_LIMIT = 10;
 function sanitizeTemplateWritePayload(payload: TemplateWritePayload) {
   const sanitized: Record<string, unknown> = {};
 
+  if (payload.channel === 'EMAIL' || payload.channel === 'WHATSAPP') {
+    sanitized.channel = payload.channel;
+  }
+
   if (typeof payload.name === 'string') {
     sanitized.name = payload.name;
   }
@@ -56,7 +60,7 @@ function serializeTemplate(template: any): SerializedMessageTemplate {
   return {
     _id: template._id.toString(),
     name: template.name,
-    subject: template.subject,
+    subject: template.subject || '',
     body: template.body,
     published: template.published
       ? {
@@ -104,14 +108,18 @@ function serializeTemplate(template: any): SerializedMessageTemplate {
 
 async function ensureDefaultTemplates() {
   const MessageTemplate = getMessageTemplateModel();
-  const visibleCount = await MessageTemplate.countDocuments(getVisibleTemplateQuery());
+  const visibleEmailCount = await MessageTemplate.countDocuments({
+    ...getVisibleTemplateQuery(),
+    channel: 'EMAIL',
+  });
 
-  if (visibleCount > 0) {
+  if (visibleEmailCount > 0) {
     return;
   }
 
   const existingDefaultTemplate = await MessageTemplate.findOne({
     ...getTemplateScopeQuery(),
+    channel: 'EMAIL',
     isDefault: true,
   }).lean();
 
@@ -188,7 +196,9 @@ export async function createTemplate(
   const MessageTemplate = getMessageTemplateModel();
   const sanitizedPayload = sanitizeTemplateWritePayload(payload) as TemplateWritePayload & {
     documentSubtype?: DocumentTemplateSubtypeKey;
+    channel?: SerializedMessageTemplate['channel'];
   };
+  const channel = sanitizedPayload.channel === 'WHATSAPP' ? 'WHATSAPP' : 'EMAIL';
   const normalizedPayload =
     sanitizedPayload.templateType === 'ACCOUNTING_DOCUMENTS'
       ? sanitizedPayload
@@ -198,9 +208,10 @@ export async function createTemplate(
         };
 
   await validateTemplateVariableUsage({
+    channel,
     templateType: normalizedPayload.templateType as SerializedMessageTemplate['templateType'],
     documentSubtype: normalizedPayload.documentSubtype,
-    subject: normalizedPayload.subject,
+    subject: channel === 'EMAIL' ? normalizedPayload.subject : undefined,
     body: normalizedPayload.body,
   });
 
@@ -208,7 +219,8 @@ export async function createTemplate(
     applyTemplateMutation(
       {
         ...normalizedPayload,
-        channel: 'EMAIL',
+        subject: channel === 'EMAIL' ? normalizedPayload.subject : undefined,
+        channel,
         business: businessId,
         createdBy: userId,
       },
@@ -244,10 +256,13 @@ export async function updateTemplate(
     throw new TemplateNotFoundError(templateId);
   }
 
-  const sanitizedPayload = sanitizeTemplateWritePayload(payload) as TemplateWritePayload & {
+  const rawSanitizedPayload = sanitizeTemplateWritePayload(payload) as TemplateWritePayload & {
     documentSubtype?: DocumentTemplateSubtypeKey;
   };
+  const { channel: _ignoredChannel, ...sanitizedPayload } = rawSanitizedPayload;
+  const preservedChannel = existingTemplate.channel as SerializedMessageTemplate['channel'];
   const mergedPayload = {
+    channel: preservedChannel,
     templateType: existingTemplate.templateType,
     documentSubtype: existingTemplate.documentSubtype,
     subject: existingTemplate.subject,
@@ -265,9 +280,10 @@ export async function updateTemplate(
         };
 
   await validateTemplateVariableUsage({
+    channel: preservedChannel,
     templateType: normalizedPayload.templateType as SerializedMessageTemplate['templateType'],
     documentSubtype: normalizedPayload.documentSubtype,
-    subject: normalizedPayload.subject,
+    subject: preservedChannel === 'EMAIL' ? normalizedPayload.subject : undefined,
     body: normalizedPayload.body,
   });
 

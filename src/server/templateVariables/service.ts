@@ -36,12 +36,13 @@ export async function getTemplateVariableCatalog(input: {
 }
 
 export async function validateTemplateVariableUsage(input: {
+  channel?: 'EMAIL' | 'WHATSAPP';
   templateType: EmailTemplateTypeKey;
   documentSubtype?: DocumentTemplateSubtypeKey;
   subject?: string;
   body?: string;
 }) {
-  const { templateType, documentSubtype, subject = '', body = '' } = input;
+  const { channel = 'EMAIL', templateType, documentSubtype, subject = '', body = '' } = input;
 
   if (templateType === 'ACCOUNTING_DOCUMENTS' && !documentSubtype) {
     throw new TemplatePayloadValidationError('Document subtype is required for accounting templates');
@@ -53,19 +54,24 @@ export async function validateTemplateVariableUsage(input: {
   });
   const allowedKeys = catalog.options.map((option) => option.value);
   const bodySections = splitTemplateBodySections(body);
-  const subjectError = getTemplateFieldValidationError({
-    fieldKind: 'subject',
-    value: subject,
-    allowedVariableKeys: allowedKeys,
-  });
+  const subjectError =
+    channel === 'EMAIL'
+      ? getTemplateFieldValidationError({
+          channel,
+          fieldKind: 'subject',
+          value: subject,
+          allowedVariableKeys: allowedKeys,
+        })
+      : null;
 
   if (subjectError) {
     throw new TemplatePayloadValidationError(subjectError);
   }
 
   const bodyError = getTemplateFieldValidationError({
+    channel,
     fieldKind: 'body',
-    value: bodySections.body,
+    value: channel === 'EMAIL' ? bodySections.body : body,
     allowedVariableKeys: allowedKeys,
   });
 
@@ -73,11 +79,15 @@ export async function validateTemplateVariableUsage(input: {
     throw new TemplatePayloadValidationError(bodyError);
   }
 
-  const signatureError = getTemplateFieldValidationError({
-    fieldKind: 'signature',
-    value: bodySections.signature,
-    allowedVariableKeys: allowedKeys,
-  });
+  const signatureError =
+    channel === 'EMAIL'
+      ? getTemplateFieldValidationError({
+          channel,
+          fieldKind: 'signature',
+          value: bodySections.signature,
+          allowedVariableKeys: allowedKeys,
+        })
+      : null;
 
   if (signatureError) {
     throw new TemplatePayloadValidationError(signatureError);

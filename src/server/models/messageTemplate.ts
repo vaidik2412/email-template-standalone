@@ -111,9 +111,7 @@ export const messageTemplateSchema = new Schema(
     body: {
       type: String,
       trim: true,
-      required() {
-        return this.channel !== 'WHATSAPP';
-      },
+      required: true,
       maxLength: DEFAULT_TEMPLATES_MAX_LENGTH,
     },
     published: publishedSchema,
@@ -135,16 +133,14 @@ export const messageTemplateSchema = new Schema(
     templateType: {
       type: String,
       enum: Object.keys(EMAIL_TEMPLATE_TYPES),
-      required() {
-        return this.channel !== 'WHATSAPP';
-      },
+      required: true,
       index: true,
     },
     documentSubtype: {
       type: String,
       enum: ACCOUNTING_DOCUMENT_SUBTYPE_KEYS,
       required() {
-        return this.channel !== 'WHATSAPP' && this.templateType === 'ACCOUNTING_DOCUMENTS';
+        return this.templateType === 'ACCOUNTING_DOCUMENTS';
       },
     },
     business: {

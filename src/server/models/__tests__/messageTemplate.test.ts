@@ -76,4 +76,50 @@ describe('messageTemplate model', () => {
 
     expect(template.validateSync()).toBeUndefined();
   });
+
+  it('allows whatsapp templates without a subject', () => {
+    const MessageTemplate = getMessageTemplateModel();
+    const template = new MessageTemplate({
+      channel: 'WHATSAPP',
+      name: 'Payment reminder',
+      body: 'Hello {{contact.name}}',
+      templateType: 'SALES_CRM',
+      business: new mongoose.Types.ObjectId(FIXED_APP_CONTEXT.business.id),
+      createdBy: new mongoose.Types.ObjectId(FIXED_APP_CONTEXT.user.id),
+    });
+
+    expect(template.validateSync()).toBeUndefined();
+  });
+
+  it('requires body and template type for whatsapp templates', () => {
+    const MessageTemplate = getMessageTemplateModel();
+    const template = new MessageTemplate({
+      channel: 'WHATSAPP',
+      name: 'Broken whatsapp template',
+      business: new mongoose.Types.ObjectId(FIXED_APP_CONTEXT.business.id),
+      createdBy: new mongoose.Types.ObjectId(FIXED_APP_CONTEXT.user.id),
+    });
+
+    const error = template.validateSync();
+
+    expect(error?.errors.body?.message).toMatch(/required/i);
+    expect(error?.errors.templateType?.message).toMatch(/required/i);
+    expect(error?.errors.subject).toBeUndefined();
+  });
+
+  it('requires document subtype for whatsapp accounting templates', () => {
+    const MessageTemplate = getMessageTemplateModel();
+    const template = new MessageTemplate({
+      channel: 'WHATSAPP',
+      name: 'Invoice reminder',
+      body: 'Invoice {{document.number}} is due',
+      templateType: 'ACCOUNTING_DOCUMENTS',
+      business: new mongoose.Types.ObjectId(FIXED_APP_CONTEXT.business.id),
+      createdBy: new mongoose.Types.ObjectId(FIXED_APP_CONTEXT.user.id),
+    });
+
+    const error = template.validateSync();
+
+    expect(error?.errors.documentSubtype?.message).toMatch(/required/i);
+  });
 });

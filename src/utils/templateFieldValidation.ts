@@ -2,16 +2,26 @@ import { findInvalidTemplateCtaTokens, hasTemplateCtaTokens } from './templateCt
 import { findUnsupportedTemplateVariables } from './templateVariables';
 
 type TemplateFieldKind = 'subject' | 'body' | 'signature';
+const WHATSAPP_TEMPLATE_BODY_MAX_LENGTH = 1024;
 
 export function getTemplateFieldValidationError(input: {
+  channel?: 'EMAIL' | 'WHATSAPP';
   fieldKind: TemplateFieldKind;
   value: string;
   allowedVariableKeys: string[];
 }) {
-  const { fieldKind, value, allowedVariableKeys } = input;
+  const { channel = 'EMAIL', fieldKind, value, allowedVariableKeys } = input;
 
   if (!value.trim()) {
     return null;
+  }
+
+  if (channel === 'WHATSAPP' && hasTemplateCtaTokens(value)) {
+    return 'CTA buttons are not supported in WhatsApp templates.';
+  }
+
+  if (channel === 'WHATSAPP' && fieldKind === 'body' && value.length > WHATSAPP_TEMPLATE_BODY_MAX_LENGTH) {
+    return `WhatsApp message can be at most ${WHATSAPP_TEMPLATE_BODY_MAX_LENGTH} characters.`;
   }
 
   if (fieldKind !== 'body' && hasTemplateCtaTokens(value)) {
