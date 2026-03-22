@@ -1,4 +1,5 @@
 import type { EmailTemplateTypeKey } from '@/data/email/templateTypes';
+import type { DocumentTemplateSubtypeKey } from '../data/email/documentSubtypes';
 
 export type SerializedActor = {
   _id: string;
@@ -27,6 +28,7 @@ export type SerializedMessageTemplate = {
   isModifiedPostPublish: boolean;
   lastPublished?: string;
   templateType: EmailTemplateTypeKey;
+  documentSubtype?: DocumentTemplateSubtypeKey;
   business: SerializedBusiness;
   createdBy?: SerializedActor;
   isDefault: boolean;
@@ -48,6 +50,7 @@ export type TemplateWritePayload = {
   subject?: string;
   body?: string;
   templateType?: EmailTemplateTypeKey;
+  documentSubtype?: DocumentTemplateSubtypeKey;
   isArchived?: boolean;
   isRemoved?: boolean;
 };

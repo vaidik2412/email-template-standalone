@@ -46,4 +46,34 @@ describe('messageTemplate model', () => {
     expect(template.isRemoved).toBe(false);
     expect(template.isModifiedPostPublish).toBe(false);
   });
+
+  it('requires a document subtype for accounting document templates', () => {
+    const MessageTemplate = getMessageTemplateModel();
+    const template = new MessageTemplate({
+      name: 'Invoice share',
+      subject: 'Invoice {{document.number}}',
+      body: 'Hello {{customer.name}}',
+      templateType: 'ACCOUNTING_DOCUMENTS',
+      business: new mongoose.Types.ObjectId(FIXED_APP_CONTEXT.business.id),
+      createdBy: new mongoose.Types.ObjectId(FIXED_APP_CONTEXT.user.id),
+    });
+
+    const error = template.validateSync();
+
+    expect(error?.errors.documentSubtype?.message).toMatch(/required/i);
+  });
+
+  it('allows crm templates without a document subtype', () => {
+    const MessageTemplate = getMessageTemplateModel();
+    const template = new MessageTemplate({
+      name: 'Lead Follow-up',
+      subject: 'Checking in',
+      body: 'Hello {{contact.name}}',
+      templateType: 'SALES_CRM',
+      business: new mongoose.Types.ObjectId(FIXED_APP_CONTEXT.business.id),
+      createdBy: new mongoose.Types.ObjectId(FIXED_APP_CONTEXT.user.id),
+    });
+
+    expect(template.validateSync()).toBeUndefined();
+  });
 });

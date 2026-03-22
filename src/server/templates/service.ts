@@ -1,5 +1,6 @@
 import { Types } from 'mongoose';
 
+import type { DocumentTemplateSubtypeKey } from '@/data/email/documentSubtypes';
 import { DEFAULT_EMAIL_TEMPLATES } from '@/data/email/defaultTemplates';
 import type {
   SerializedMessageTemplate,
@@ -13,6 +14,7 @@ import { getMessageTemplateModel } from '../models/messageTemplate';
 import { applyTemplateMutation } from './mutations';
 import { TemplateNotFoundError } from './errors';
 import { getTemplateScopeQuery, getVisibleTemplateQuery } from './queries';
+import { validateTemplateVariableUsage } from '../templateVariables/service';
 
 const DEFAULT_LIMIT = 10;
 
@@ -33,6 +35,10 @@ function sanitizeTemplateWritePayload(payload: TemplateWritePayload) {
 
   if (typeof payload.templateType === 'string') {
     sanitized.templateType = payload.templateType;
+  }
+
+  if (typeof payload.documentSubtype === 'string') {
+    sanitized.documentSubtype = payload.documentSubtype;
   }
 
   if (typeof payload.isArchived === 'boolean') {
@@ -64,6 +70,7 @@ function serializeTemplate(template: any): SerializedMessageTemplate {
     isModifiedPostPublish: Boolean(template.isModifiedPostPublish),
     lastPublished: template.lastPublished ? new Date(template.lastPublished).toISOString() : undefined,
     templateType: template.templateType,
+    documentSubtype: template.documentSubtype,
     business: {
       _id: FIXED_APP_CONTEXT.business.id,
       urlKey: FIXED_APP_CONTEXT.business.urlKey,
@@ -179,11 +186,28 @@ export async function createTemplate(
   const businessId = new Types.ObjectId(FIXED_APP_CONTEXT.business.id);
   const userId = new Types.ObjectId(actorId);
   const MessageTemplate = getMessageTemplateModel();
+  const sanitizedPayload = sanitizeTemplateWritePayload(payload) as TemplateWritePayload & {
+    documentSubtype?: DocumentTemplateSubtypeKey;
+  };
+  const normalizedPayload =
+    sanitizedPayload.templateType === 'ACCOUNTING_DOCUMENTS'
+      ? sanitizedPayload
+      : {
+          ...sanitizedPayload,
+          documentSubtype: undefined,
+        };
+
+  await validateTemplateVariableUsage({
+    templateType: normalizedPayload.templateType as SerializedMessageTemplate['templateType'],
+    documentSubtype: normalizedPayload.documentSubtype,
+    subject: normalizedPayload.subject,
+    body: normalizedPayload.body,
+  });
 
   const document = await MessageTemplate.create(
     applyTemplateMutation(
       {
-        ...sanitizeTemplateWritePayload(payload),
+        ...normalizedPayload,
         channel: 'EMAIL',
         business: businessId,
         createdBy: userId,
@@ -211,16 +235,60 @@ export async function updateTemplate(
 
   const actorId = FIXED_APP_CONTEXT.user.id;
   const MessageTemplate = getMessageTemplateModel();
+  const existingTemplate = await MessageTemplate.findOne({
+    ...getTemplateScopeQuery(),
+    _id: new Types.ObjectId(templateId),
+  }).lean();
+
+  if (!existingTemplate?._id) {
+    throw new TemplateNotFoundError(templateId);
+  }
+
+  const sanitizedPayload = sanitizeTemplateWritePayload(payload) as TemplateWritePayload & {
+    documentSubtype?: DocumentTemplateSubtypeKey;
+  };
+  const mergedPayload = {
+    templateType: existingTemplate.templateType,
+    documentSubtype: existingTemplate.documentSubtype,
+    subject: existingTemplate.subject,
+    body: existingTemplate.body,
+    ...sanitizedPayload,
+  } as TemplateWritePayload & {
+    documentSubtype?: DocumentTemplateSubtypeKey;
+  };
+  const normalizedPayload =
+    mergedPayload.templateType === 'ACCOUNTING_DOCUMENTS'
+      ? mergedPayload
+      : {
+          ...mergedPayload,
+          documentSubtype: undefined,
+        };
+
+  await validateTemplateVariableUsage({
+    templateType: normalizedPayload.templateType as SerializedMessageTemplate['templateType'],
+    documentSubtype: normalizedPayload.documentSubtype,
+    subject: normalizedPayload.subject,
+    body: normalizedPayload.body,
+  });
 
   const template = await MessageTemplate.findOneAndUpdate(
     {
       ...getTemplateScopeQuery(),
       _id: new Types.ObjectId(templateId),
     },
-    applyTemplateMutation(sanitizeTemplateWritePayload(payload), {
-      actorId,
-      isPublished: options.isPublished,
-    }),
+    {
+      $set: applyTemplateMutation(sanitizedPayload, {
+        actorId,
+        isPublished: options.isPublished,
+      }),
+      ...(normalizedPayload.templateType === 'ACCOUNTING_DOCUMENTS'
+        ? {}
+        : {
+            $unset: {
+              documentSubtype: 1,
+            },
+          }),
+    },
     {
       new: true,
       runValidators: true,

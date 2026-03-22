@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   EMAIL_TEMPLATE_PREVIEW_CONTEXT,
+  buildTemplatePreviewValueMap,
   insertTemplateVariableAtSelection,
   resolveTemplatePreviewText,
 } from '../templatePreviewUtils';
@@ -23,6 +24,75 @@ describe('resolveTemplatePreviewText', () => {
     expect(resolveTemplatePreviewText('Call {{my.name}} at {{my.phone}}')).toBe(
       `Call ${EMAIL_TEMPLATE_PREVIEW_CONTEXT.sender.name} at +91 98765 00000`,
     );
+  });
+
+  it('resolves document and vendor field samples from the active variable catalog', () => {
+    expect(
+      resolveTemplatePreviewText(
+        'Hello {{customer.name}} - {{vendorFields.invoice_owner}} sent {{document.number}}',
+        buildTemplatePreviewValueMap([
+          {
+            label: 'Customer Name',
+            value: 'customer.name',
+            group: 'Document',
+            scope: 'ACCOUNTING_DOCUMENTS',
+            sampleValue: 'Aarav Industries',
+          },
+          {
+            label: 'Invoice Owner',
+            value: 'vendorFields.invoice_owner',
+            group: 'Vendor Fields',
+            scope: 'ACCOUNTING_DOCUMENTS',
+            sampleValue: 'Sample Invoice Owner',
+          },
+          {
+            label: 'Document Number',
+            value: 'document.number',
+            group: 'Document',
+            scope: 'ACCOUNTING_DOCUMENTS',
+            sampleValue: 'INV-2026-001',
+          },
+        ]),
+      ),
+    ).toBe('Hello Aarav Industries - Sample Invoice Owner sent INV-2026-001');
+  });
+
+  it('normalizes editor line-break markup so ordered lists stay on separate lines', () => {
+    expect(
+      resolveTemplatePreviewText(
+        '{{business.name}}\n<br>\n1. {{document.total}}\n2. {{document.amount_paid}}\n3. {{document.amount_due}}',
+        buildTemplatePreviewValueMap([
+          {
+            label: 'Business Name',
+            value: 'business.name',
+            group: 'Document',
+            scope: 'ACCOUNTING_DOCUMENTS',
+            sampleValue: 'Refrens Demo Business',
+          },
+          {
+            label: 'Document Total',
+            value: 'document.total',
+            group: 'Document',
+            scope: 'ACCOUNTING_DOCUMENTS',
+            sampleValue: '12,500.00',
+          },
+          {
+            label: 'Amount Paid',
+            value: 'document.amount_paid',
+            group: 'Document',
+            scope: 'ACCOUNTING_DOCUMENTS',
+            sampleValue: '3,500.00',
+          },
+          {
+            label: 'Amount Due',
+            value: 'document.amount_due',
+            group: 'Document',
+            scope: 'ACCOUNTING_DOCUMENTS',
+            sampleValue: '9,000.00',
+          },
+        ]),
+      ),
+    ).toBe('Refrens Demo Business\n\n1. 12,500.00\n2. 3,500.00\n3. 9,000.00');
   });
 });
 

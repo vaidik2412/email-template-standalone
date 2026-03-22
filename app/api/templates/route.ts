@@ -7,13 +7,17 @@ function parsePublishIntent(request: Request) {
 
 function jsonErrorResponse(error: unknown) {
   const message = error instanceof Error ? error.message : 'Something went wrong';
+  const status =
+    typeof error === 'object' && error !== null && 'status' in error && typeof error.status === 'number'
+      ? error.status
+      : 500;
 
   return Response.json(
     {
       message,
     },
     {
-      status: 500,
+      status,
     },
   );
 }

@@ -1,29 +1,37 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
-
-vi.mock('next/dynamic', () => ({
-  default: () =>
-    function MockToastTemplateViewerClient(props: { value: string }) {
-      return <div data-testid='toast-template-viewer-client'>{props.value}</div>;
-    },
-}));
+import { describe, expect, it } from 'vitest';
 
 import TemplateMarkdownViewer from '../TemplateMarkdownViewer';
 
 describe('TemplateMarkdownViewer', () => {
-  const originalNodeEnv = process.env.NODE_ENV;
+  it('renders CTA tokens as preview buttons while preserving surrounding markdown', () => {
+    render(
+      <TemplateMarkdownViewer
+        value={
+          'Hello {{customer.name}}\n\n{{cta label="Pay {{document.number}}" url="https://pay.test/{{document.number}}" bg="#0f766e" text="#f8fafc"}}\n\nThanks'
+        }
+        previewVariableValues={{
+          'customer.name': 'Aarav Industries',
+          'document.number': 'INV-2026-001',
+        }}
+      />,
+    );
 
-  afterEach(() => {
-    process.env.NODE_ENV = originalNodeEnv;
-  });
-
-  it('uses the safe fallback renderer for template preview markdown in development', () => {
-    process.env.NODE_ENV = 'development';
-
-    render(<TemplateMarkdownViewer value='Hello {{contact.name}}' />);
-
-    expect(screen.queryByTestId('toast-template-viewer-client')).not.toBeInTheDocument();
-    expect(screen.getByText('Hello {{contact.name}}')).toBeInTheDocument();
+    expect(screen.getByText('Hello Aarav Industries')).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', {
+        name: 'Pay INV-2026-001',
+      }),
+    ).toHaveAttribute('href', 'https://pay.test/INV-2026-001');
+    expect(
+      screen.getByRole('link', {
+        name: 'Pay INV-2026-001',
+      }),
+    ).toHaveStyle({
+      backgroundColor: 'rgb(15, 118, 110)',
+      color: 'rgb(248, 250, 252)',
+    });
+    expect(screen.getByText('Thanks')).toBeInTheDocument();
   });
 });

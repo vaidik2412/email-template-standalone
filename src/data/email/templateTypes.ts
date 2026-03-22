@@ -6,7 +6,7 @@ export const EMAIL_TEMPLATE_TYPES = {
   },
   ACCOUNTING_DOCUMENTS: {
     label: 'Accounting Documents',
-    enabled: false,
+    enabled: true,
     key: 'ACCOUNTING_DOCUMENTS',
   },
   PAYMENT_REMINDERS: {

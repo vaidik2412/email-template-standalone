@@ -1,13 +1,12 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Editor } from '@toast-ui/react-editor';
 import type { EditorProps } from '@toast-ui/react-editor';
 import type { SelectionPos } from '@toast-ui/editor';
 
-import { EMAIL_TEMPLATE_VARIABLE_KEYS } from '@/data/email/lmsVariables';
-
-import { getTemplateVariableToken } from './templatePreviewUtils';
+import TemplateCtaComposerButton from './TemplateCtaComposerButton';
 import type { TemplateVariableInsertionRequest } from './templateVariableInsertion';
 
 type ToastTemplateEditorClientProps = {
@@ -30,6 +29,12 @@ export default function ToastTemplateEditorClient({
   const editorRef = useRef<Editor>(null);
   const selectionRef = useRef<SelectionPos | null>(null);
   const lastHandledInsertionRequestIdRef = useRef<number | null>(null);
+  const ctaToolbarMountElementRef = useRef<HTMLDivElement | null>(null);
+
+  if (!ctaToolbarMountElementRef.current && typeof document !== 'undefined') {
+    ctaToolbarMountElementRef.current = document.createElement('div');
+    ctaToolbarMountElementRef.current.className = 'template-toolbar-cta-root';
+  }
 
   useEffect(() => {
     const editor = editorRef.current?.getInstance();
@@ -71,7 +76,7 @@ export default function ToastTemplateEditorClient({
       editor.moveCursorToEnd(true);
     }
 
-    editor.insertText(getTemplateVariableToken(pendingVariableInsertion.variableKey));
+    editor.insertText(pendingVariableInsertion.text);
     selectionRef.current = editor.getSelection();
   }, [pendingVariableInsertion]);
 
@@ -81,13 +86,9 @@ export default function ToastTemplateEditorClient({
         rule: VARIABLE_PATTERN,
         toDOM(text: string) {
           const span = document.createElement('span');
-          const matched = text.match(VARIABLE_PATTERN)?.[0] || '';
 
           span.innerHTML = text;
-
-          if (EMAIL_TEMPLATE_VARIABLE_KEYS.some((key) => matched === `{{${key}}}`)) {
-            span.classList.add('highlighted-variable');
-          }
+          span.classList.add('highlighted-variable');
 
           return span;
         },
@@ -102,6 +103,15 @@ export default function ToastTemplateEditorClient({
       ['hr', 'quote'],
       ['ul', 'ol', 'task', 'indent', 'outdent'],
       ['code'],
+      ctaToolbarMountElementRef.current
+        ? [
+            {
+              name: 'ctaButton',
+              tooltip: 'Insert button',
+              el: ctaToolbarMountElementRef.current,
+            },
+          ]
+        : [],
     ],
     [],
   );
@@ -154,6 +164,40 @@ export default function ToastTemplateEditorClient({
           onChange(editorRef.current?.getInstance().getMarkdown() || '');
         }}
       />
+      {ctaToolbarMountElementRef.current
+        ? createPortal(
+            <TemplateCtaComposerButton
+              buttonAriaLabel='Insert button'
+              buttonClassName='template-toolbar-button template-toolbar-button--cta'
+              buttonLabel='CTA'
+              onOpen={() => {
+                onActivate?.();
+              }}
+              onInsert={(ctaToken) => {
+                const editor = editorRef.current?.getInstance();
+
+                if (!editor) {
+                  return;
+                }
+
+                onActivate?.();
+                editor.focus();
+
+                if (selectionRef.current) {
+                  const [start, end] = selectionRef.current as [SelectionPos[0], SelectionPos[1]];
+
+                  editor.setSelection(start, end);
+                } else {
+                  editor.moveCursorToEnd(true);
+                }
+
+                editor.insertText(ctaToken);
+                selectionRef.current = editor.getSelection();
+              }}
+            />,
+            ctaToolbarMountElementRef.current,
+          )
+        : null}
     </div>
   );
 }

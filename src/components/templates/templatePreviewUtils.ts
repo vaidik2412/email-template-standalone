@@ -1,4 +1,6 @@
+import type { TemplateVariableOption } from '@/types/templateVariable';
 import { removeMarkdownEditorsInternalVariables } from '@/utils/removeMarkdownEditorsInternalVariables';
+import { CRM_TEMPLATE_PREVIEW_VALUES } from '@/data/email/templateVariables';
 
 type TemplatePreviewContext = {
   sender: {
@@ -43,24 +45,29 @@ export const EMAIL_TEMPLATE_PREVIEW_CONTEXT: TemplatePreviewContext = Object.fre
 });
 
 const PREVIEW_VARIABLE_VALUES: Record<string, string> = {
-  'contact.name': EMAIL_TEMPLATE_PREVIEW_CONTEXT.recipient.name,
-  'contact.email': EMAIL_TEMPLATE_PREVIEW_CONTEXT.recipient.email,
-  'contact.phone': EMAIL_TEMPLATE_PREVIEW_CONTEXT.recipient.phone,
-  'contact.country': EMAIL_TEMPLATE_PREVIEW_CONTEXT.recipient.country,
-  'company.name': EMAIL_TEMPLATE_PREVIEW_CONTEXT.recipient.companyName,
-  'my.name': EMAIL_TEMPLATE_PREVIEW_CONTEXT.sender.name,
-  'my.phone': EMAIL_TEMPLATE_PREVIEW_CONTEXT.sender.phone,
-  'my.business': EMAIL_TEMPLATE_PREVIEW_CONTEXT.business.name,
-  'business.name': EMAIL_TEMPLATE_PREVIEW_CONTEXT.business.name,
+  ...CRM_TEMPLATE_PREVIEW_VALUES,
 };
 
 const TEMPLATE_VARIABLE_PATTERN = /\{\{([^}]+)\}\}/g;
 
-export function resolveTemplatePreviewText(value: string) {
+export function buildTemplatePreviewValueMap(variableOptions: TemplateVariableOption[]) {
+  return variableOptions.reduce<Record<string, string>>((acc, option) => {
+    if (typeof option.sampleValue === 'string' && option.sampleValue) {
+      acc[option.value] = option.sampleValue;
+    }
+
+    return acc;
+  }, {});
+}
+
+export function resolveTemplatePreviewText(
+  value: string,
+  previewVariableValues: Record<string, string> = PREVIEW_VARIABLE_VALUES,
+) {
   const normalizedValue = removeMarkdownEditorsInternalVariables(value);
 
   return normalizedValue.replace(TEMPLATE_VARIABLE_PATTERN, (match, token: string) => {
-    return PREVIEW_VARIABLE_VALUES[token] ?? match;
+    return previewVariableValues[token] ?? match;
   });
 }
 
@@ -68,19 +75,32 @@ export function getTemplateVariableToken(variableKey: string) {
   return `{{${variableKey}}}`;
 }
 
+export function insertTextAtSelection(
+  currentValue: string,
+  nextText: string,
+  selectionStart: number | null,
+  selectionEnd: number | null,
+): SubjectVariableInsertResult {
+  const safeStart = selectionStart ?? currentValue.length;
+  const safeEnd = selectionEnd ?? safeStart;
+
+  return {
+    nextValue: `${currentValue.slice(0, safeStart)}${nextText}${currentValue.slice(safeEnd)}`,
+    nextSelectionStart: safeStart + nextText.length,
+    nextSelectionEnd: safeStart + nextText.length,
+  };
+}
+
 export function insertTemplateVariableAtSelection(
   currentValue: string,
   variableKey: string,
   selectionStart: number | null,
   selectionEnd: number | null,
-): SubjectVariableInsertResult {
-  const nextToken = getTemplateVariableToken(variableKey);
-  const safeStart = selectionStart ?? currentValue.length;
-  const safeEnd = selectionEnd ?? safeStart;
-
-  return {
-    nextValue: `${currentValue.slice(0, safeStart)}${nextToken}${currentValue.slice(safeEnd)}`,
-    nextSelectionStart: safeStart + nextToken.length,
-    nextSelectionEnd: safeStart + nextToken.length,
-  };
+) {
+  return insertTextAtSelection(
+    currentValue,
+    getTemplateVariableToken(variableKey),
+    selectionStart,
+    selectionEnd,
+  );
 }

@@ -2,6 +2,10 @@ import React from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import {
+  TEMPLATE_CTA_RECENT_BACKGROUND_COLORS_STORAGE_KEY,
+  TEMPLATE_CTA_RECENT_TEXT_COLORS_STORAGE_KEY,
+} from '@/utils/templateCtaColors';
 import TemplateFormScreen from '../TemplateFormScreen';
 
 const push = vi.fn();
@@ -15,6 +19,8 @@ vi.mock('next/navigation', () => ({
 describe('TemplateFormScreen in create mode', () => {
   beforeEach(() => {
     push.mockReset();
+    window.localStorage?.removeItem?.(TEMPLATE_CTA_RECENT_BACKGROUND_COLORS_STORAGE_KEY);
+    window.localStorage?.removeItem?.(TEMPLATE_CTA_RECENT_TEXT_COLORS_STORAGE_KEY);
   });
 
   afterEach(() => {
@@ -159,6 +165,66 @@ describe('TemplateFormScreen in create mode', () => {
     });
   });
 
+  it('inserts a CTA button token into the body from the insert button popover', async () => {
+    render(<TemplateFormScreen mode='create' />);
+
+    const bodyField = screen.getByLabelText(/email body/i) as HTMLTextAreaElement;
+
+    await act(async () => {
+      fireEvent.change(bodyField, {
+        target: { value: 'Hello\n\n' },
+      });
+
+      bodyField.focus();
+      bodyField.setSelectionRange(bodyField.value.length, bodyField.value.length);
+      fireEvent.select(bodyField);
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /insert button/i }));
+    });
+
+    fireEvent.change(screen.getByLabelText(/button label/i), {
+      target: { value: 'Pay invoice' },
+    });
+    fireEvent.change(screen.getByLabelText(/button url/i), {
+      target: { value: 'https://pay.test/{{document.number}}' },
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /^insert$/i }));
+    });
+
+    await waitFor(() => {
+      expect(bodyField).toHaveValue(
+        'Hello\n\n{{cta label="Pay invoice" url="https://pay.test/{{document.number}}" bg="#4f46e5" text="#ffffff"}}',
+      );
+    });
+  });
+
+  it('blocks CTA tokens in the subject field', async () => {
+    const fetchMock = vi.fn();
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<TemplateFormScreen mode='create' />);
+
+    fireEvent.change(screen.getByLabelText(/template name/i), {
+      target: { value: 'CTA validation template' },
+    });
+    fireEvent.change(screen.getByLabelText(/email subject/i), {
+      target: { value: '{{cta label="Pay now" url="https://pay.test"}}' },
+    });
+    fireEvent.change(screen.getByLabelText(/email body/i), {
+      target: { value: 'Hello there' },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /publish template/i }));
+
+    expect(await screen.findByText(/cta buttons can only be used in the email body/i)).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('saves a draft without publish semantics', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
@@ -237,5 +303,85 @@ describe('TemplateFormScreen in create mode', () => {
     });
 
     expect(push).toHaveBeenCalledWith('/templates/template-live/edit');
+  });
+
+  it('reveals document subtype and refreshes the variable picker for accounting templates', async () => {
+    render(
+      <TemplateFormScreen
+        mode='create'
+        indexedCustomFields={{
+          INVOICE: {
+            invoice_owner: {
+              name: 'invoice_owner',
+              label: 'Invoice Owner',
+              dataType: 'TEXT',
+            },
+          },
+        }}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText(/category/i), {
+      target: { value: 'ACCOUNTING_DOCUMENTS' },
+    });
+
+    expect(await screen.findByLabelText(/document subtype/i)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText(/document subtype/i), {
+      target: { value: 'INVOICE' },
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /^add variable$/i }));
+    });
+
+    expect(await screen.findByRole('button', { name: /document number/i })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /document sharelink/i })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /invoice owner/i })).toBeInTheDocument();
+  });
+
+  it('inserts a document sharelink as a subtype-specific CTA in the body', async () => {
+    render(<TemplateFormScreen mode='create' />);
+
+    fireEvent.change(screen.getByLabelText(/category/i), {
+      target: { value: 'ACCOUNTING_DOCUMENTS' },
+    });
+    fireEvent.change(await screen.findByLabelText(/document subtype/i), {
+      target: { value: 'INVOICE' },
+    });
+
+    const bodyField = screen.getByLabelText(/email body/i) as HTMLTextAreaElement;
+
+    await act(async () => {
+      fireEvent.change(bodyField, {
+        target: { value: 'Hello\n\n' },
+      });
+
+      bodyField.focus();
+      bodyField.setSelectionRange(bodyField.value.length, bodyField.value.length);
+      fireEvent.select(bodyField);
+    });
+
+    fireEvent.click(screen.getByLabelText(/email subject/i));
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /^add variable$/i }));
+    });
+
+    await act(async () => {
+      fireEvent.click(await screen.findByRole('button', { name: /document sharelink/i }));
+    });
+
+    await waitFor(() => {
+      expect(bodyField).toHaveValue(
+        'Hello\n\n{{cta label="View Invoice" url="{{document.share_link}}" bg="#4f46e5" text="#ffffff"}}',
+      );
+    });
+
+    expect(
+      screen.getByRole('link', {
+        name: 'View Invoice',
+      }),
+    ).toHaveAttribute('href', 'https://share.refrens.local/invoices/INV-2026-001');
   });
 });

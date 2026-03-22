@@ -1,6 +1,7 @@
 import mongoose, { Schema, type InferSchemaType, type Model } from 'mongoose';
 
 import { EMAIL_TEMPLATE_TYPES } from '@/data/email/templateTypes';
+import { ACCOUNTING_DOCUMENT_SUBTYPE_KEYS } from '../../data/email/documentSubtypes';
 
 export const MESSAGE_TEMPLATES_MODEL_NAME = 'MessageTemplate';
 export const MESSAGE_TEMPLATES_COLLECTION_NAME = 'messageTemplates';
@@ -138,6 +139,13 @@ export const messageTemplateSchema = new Schema(
         return this.channel !== 'WHATSAPP';
       },
       index: true,
+    },
+    documentSubtype: {
+      type: String,
+      enum: ACCOUNTING_DOCUMENT_SUBTYPE_KEYS,
+      required() {
+        return this.channel !== 'WHATSAPP' && this.templateType === 'ACCOUNTING_DOCUMENTS';
+      },
     },
     business: {
       type: Schema.Types.ObjectId,

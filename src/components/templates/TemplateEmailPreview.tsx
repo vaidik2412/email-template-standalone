@@ -2,13 +2,22 @@
 
 import React, { useMemo } from 'react';
 
+import type { EmailTemplateTypeKey } from '@/data/email/templateTypes';
+import type { TemplateVariableOption } from '@/types/templateVariable';
+
 import TemplateMarkdownViewer from './TemplateMarkdownViewer';
-import { EMAIL_TEMPLATE_PREVIEW_CONTEXT, resolveTemplatePreviewText } from './templatePreviewUtils';
+import {
+  EMAIL_TEMPLATE_PREVIEW_CONTEXT,
+  buildTemplatePreviewValueMap,
+  resolveTemplatePreviewText,
+} from './templatePreviewUtils';
 
 type TemplateEmailPreviewProps = {
+  templateType: EmailTemplateTypeKey;
   subject: string;
   body: string;
   signature: string;
+  variableOptions: TemplateVariableOption[];
 };
 
 function formatPreviewPerson(name: string, email: string) {
@@ -16,21 +25,38 @@ function formatPreviewPerson(name: string, email: string) {
 }
 
 export default function TemplateEmailPreview({
+  templateType,
   subject,
   body,
   signature,
+  variableOptions,
 }: TemplateEmailPreviewProps) {
-  const previewSubject = useMemo(() => resolveTemplatePreviewText(subject).trim(), [subject]);
-  const previewBody = useMemo(() => resolveTemplatePreviewText(body).trim(), [body]);
+  const previewValues = useMemo(
+    () => buildTemplatePreviewValueMap(variableOptions),
+    [variableOptions],
+  );
+  const previewSubject = useMemo(
+    () => resolveTemplatePreviewText(subject, previewValues).trim(),
+    [previewValues, subject],
+  );
+  const previewBody = useMemo(() => body.trim(), [body]);
   const previewSignatureLines = useMemo(
     () =>
-      resolveTemplatePreviewText(signature)
+      resolveTemplatePreviewText(signature, previewValues)
         .trim()
         .split('\n')
         .map((line) => line.trim())
         .filter(Boolean),
-    [signature],
+    [previewValues, signature],
   );
+  const previewRecipientName =
+    (templateType === 'ACCOUNTING_DOCUMENTS'
+      ? previewValues['customer.name']
+      : previewValues['contact.name']) || EMAIL_TEMPLATE_PREVIEW_CONTEXT.recipient.name;
+  const previewRecipientEmail =
+    (templateType === 'ACCOUNTING_DOCUMENTS'
+      ? previewValues['customer.email']
+      : previewValues['contact.email']) || EMAIL_TEMPLATE_PREVIEW_CONTEXT.recipient.email;
 
   return (
     <div className='template-preview-card template-email-preview'>
@@ -47,10 +73,7 @@ export default function TemplateEmailPreview({
         <div className='template-email-preview-row'>
           <span className='template-email-preview-label'>To</span>
           <span className='template-email-preview-value'>
-            {formatPreviewPerson(
-              EMAIL_TEMPLATE_PREVIEW_CONTEXT.recipient.name,
-              EMAIL_TEMPLATE_PREVIEW_CONTEXT.recipient.email,
-            )}
+            {formatPreviewPerson(previewRecipientName, previewRecipientEmail)}
           </span>
         </div>
         <div className='template-email-preview-row template-email-preview-row--subject'>
@@ -63,7 +86,7 @@ export default function TemplateEmailPreview({
 
       <div className='template-email-preview-body'>
         {previewBody ? (
-          <TemplateMarkdownViewer value={previewBody} />
+          <TemplateMarkdownViewer value={previewBody} previewVariableValues={previewValues} />
         ) : (
           <p className='template-preview-empty'>Start writing to preview this email.</p>
         )}

@@ -7,7 +7,8 @@ const ToastTemplateEditorClient = dynamic(() => import('./ToastTemplateEditorCli
   ssr: false,
 });
 
-import { insertTemplateVariableAtSelection } from './templatePreviewUtils';
+import TemplateCtaComposerButton from './TemplateCtaComposerButton';
+import { insertTextAtSelection } from './templatePreviewUtils';
 import type { TemplateVariableInsertionRequest } from './templateVariableInsertion';
 
 type TemplateMarkdownEditorProps = {
@@ -37,6 +38,19 @@ export default function TemplateMarkdownEditor({
   const pendingSelectionRef = useRef<{ start: number; end: number } | null>(null);
   const lastHandledInsertionRequestIdRef = useRef<number | null>(null);
 
+  const applyTextInsertion = (text: string) => {
+    const selectionStart = textareaRef.current?.selectionStart ?? selectionRef.current.start;
+    const selectionEnd = textareaRef.current?.selectionEnd ?? selectionRef.current.end;
+    const nextSelection = insertTextAtSelection(value, text, selectionStart, selectionEnd);
+
+    pendingSelectionRef.current = {
+      start: nextSelection.nextSelectionStart,
+      end: nextSelection.nextSelectionEnd,
+    };
+
+    onChange(nextSelection.nextValue);
+  };
+
   useEffect(() => {
     if (process.env.NODE_ENV !== 'test' || !pendingSelectionRef.current || !textareaRef.current) {
       return;
@@ -60,22 +74,7 @@ export default function TemplateMarkdownEditor({
     }
 
     lastHandledInsertionRequestIdRef.current = pendingVariableInsertion.id;
-
-    const selectionStart = textareaRef.current?.selectionStart ?? selectionRef.current.start;
-    const selectionEnd = textareaRef.current?.selectionEnd ?? selectionRef.current.end;
-    const nextSelection = insertTemplateVariableAtSelection(
-      value,
-      pendingVariableInsertion.variableKey,
-      selectionStart,
-      selectionEnd,
-    );
-
-    pendingSelectionRef.current = {
-      start: nextSelection.nextSelectionStart,
-      end: nextSelection.nextSelectionEnd,
-    };
-
-    onChange(nextSelection.nextValue);
+    applyTextInsertion(pendingVariableInsertion.text);
   }, [onChange, pendingVariableInsertion, value]);
 
   const updateSelection = (element: HTMLTextAreaElement) => {
@@ -95,6 +94,18 @@ export default function TemplateMarkdownEditor({
 
       {process.env.NODE_ENV === 'test' ? (
         <div className='template-editor-shell'>
+          <div className='template-editor-toolbar-fallback'>
+            <TemplateCtaComposerButton
+              buttonClassName='template-toolbar-button template-toolbar-button--cta'
+              onInsert={(ctaToken) => {
+                onActivate?.();
+                applyTextInsertion(ctaToken);
+              }}
+              onOpen={() => {
+                onActivate?.();
+              }}
+            />
+          </div>
           <textarea
             id={id}
             ref={textareaRef}

@@ -4,9 +4,23 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useFormik } from 'formik';
 
+import {
+  ACCOUNTING_DOCUMENT_SUBTYPES,
+  ACCOUNTING_DOCUMENT_SUBTYPE_KEYS,
+  type DocumentTemplateSubtypeKey,
+} from '@/data/email/documentSubtypes';
+import type { IndexedCustomFieldsByCategory } from '@/data/email/templateVariables';
+import {
+  buildTemplateVariableCatalog,
+  getDocumentShareLinkCtaLabel,
+} from '@/data/email/templateVariables';
 import { ENABLED_EMAIL_TEMPLATE_TYPE_KEYS, EMAIL_TEMPLATE_TYPES } from '@/data/email/templateTypes';
 import type { SerializedMessageTemplate, TemplateWritePayload } from '@/types/messageTemplate';
+import type { TemplateVariableOption } from '@/types/templateVariable';
 import { removeMarkdownEditorsInternalVariables } from '@/utils/removeMarkdownEditorsInternalVariables';
+import { buildTemplateCtaToken } from '@/utils/templateCtas';
+import { getTemplateFieldValidationError } from '@/utils/templateFieldValidation';
+import { getTemplateVariableToken } from './templatePreviewUtils';
 
 import { templateFormSchema } from './templateFormSchema';
 import TemplateEmailPreview from './TemplateEmailPreview';
@@ -28,6 +42,7 @@ type TemplateFormScreenProps = {
   mode: 'create' | 'edit';
   templateId?: string;
   copyFromId?: string;
+  indexedCustomFields?: IndexedCustomFieldsByCategory;
 };
 
 type TemplateFormValues = {
@@ -36,6 +51,7 @@ type TemplateFormValues = {
   body: string;
   signature: string;
   templateType: (typeof ENABLED_EMAIL_TEMPLATE_TYPE_KEYS)[number];
+  documentSubtype: DocumentTemplateSubtypeKey | '';
   isArchived: boolean;
 };
 
@@ -45,6 +61,7 @@ const defaultValues: TemplateFormValues = {
   body: '',
   signature: DEFAULT_EMAIL_SIGNATURE,
   templateType: ENABLED_EMAIL_TEMPLATE_TYPE_KEYS[0],
+  documentSubtype: '',
   isArchived: false,
 };
 
@@ -64,6 +81,7 @@ function getDuplicateValues(template: SerializedMessageTemplate): TemplateFormVa
     body: bodySections.body,
     signature: bodySections.signature,
     templateType: source.templateType,
+    documentSubtype: source.documentSubtype || '',
     isArchived: false,
   };
 }
@@ -77,6 +95,7 @@ function getEditValues(template: SerializedMessageTemplate): TemplateFormValues 
     body: bodySections.body,
     signature: bodySections.signature,
     templateType: template.templateType,
+    documentSubtype: template.documentSubtype || '',
     isArchived: template.isArchived,
   };
 }
@@ -147,15 +166,14 @@ export default function TemplateFormScreen({
   mode,
   templateId,
   copyFromId,
+  indexedCustomFields = {},
 }: TemplateFormScreenProps) {
   const [initialValues, setInitialValues] = useState<TemplateFormValues>(defaultValues);
   const [isBootstrapping, setIsBootstrapping] = useState(mode === 'edit' || Boolean(copyFromId));
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loadedTemplate, setLoadedTemplate] = useState<SerializedMessageTemplate | null>(null);
   const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
-  const [activeVariableTarget, setActiveVariableTarget] = useState<TemplateVariableTarget | null>(
-    null,
-  );
+  const [activeVariableTarget, setActiveVariableTarget] = useState<TemplateVariableTarget>('subject');
   const [pendingBodyVariableInsertion, setPendingBodyVariableInsertion] =
     useState<TemplateVariableInsertionRequest | null>(null);
   const actionsRef = useRef<HTMLDivElement>(null);
@@ -229,10 +247,62 @@ export default function TemplateFormScreen({
     enableReinitialize: true,
     initialValues,
     validationSchema: templateFormSchema,
+    validate: (values) => {
+      const errors: Partial<Record<keyof TemplateFormValues, string>> = {};
+      const allowedVariableKeys = buildTemplateVariableCatalog({
+        templateType: values.templateType,
+        documentSubtype:
+          values.templateType === 'ACCOUNTING_DOCUMENTS' && values.documentSubtype
+            ? values.documentSubtype
+            : undefined,
+        indexedCustomFields,
+      }).options.map((option) => option.value);
+
+      const subjectError = getTemplateFieldValidationError({
+        fieldKind: 'subject',
+        value: values.subject,
+        allowedVariableKeys,
+      });
+      if (subjectError) {
+        errors.subject = subjectError;
+      }
+
+      const bodyError = getTemplateFieldValidationError({
+        fieldKind: 'body',
+        value: values.body,
+        allowedVariableKeys,
+      });
+      if (bodyError) {
+        errors.body = bodyError;
+      }
+
+      const signatureError = getTemplateFieldValidationError({
+        fieldKind: 'signature',
+        value: values.signature,
+        allowedVariableKeys,
+      });
+      if (signatureError) {
+        errors.signature = signatureError;
+      }
+
+      return errors;
+    },
     onSubmit: async (values) => {
       await submitTemplate(buildTemplatePayload(values), true);
     },
   });
+  const variableCatalog = useMemo(
+    () =>
+      buildTemplateVariableCatalog({
+        templateType: formik.values.templateType,
+        documentSubtype:
+          formik.values.templateType === 'ACCOUNTING_DOCUMENTS' && formik.values.documentSubtype
+            ? formik.values.documentSubtype
+            : undefined,
+        indexedCustomFields,
+      }),
+    [formik.values.documentSubtype, formik.values.templateType, indexedCustomFields],
+  );
 
   const previewBody = useMemo(
     () => removeMarkdownEditorsInternalVariables(formik.values.body).trim(),
@@ -247,6 +317,8 @@ export default function TemplateFormScreen({
       values.signature,
     ),
     templateType: values.templateType,
+    documentSubtype:
+      values.templateType === 'ACCOUNTING_DOCUMENTS' ? values.documentSubtype || undefined : undefined,
     isArchived: values.isArchived,
   });
 
@@ -289,12 +361,12 @@ export default function TemplateFormScreen({
     };
   };
 
-  const createVariableInsertionRequest = (variableKey: string): TemplateVariableInsertionRequest => {
+  const createVariableInsertionRequest = (text: string): TemplateVariableInsertionRequest => {
     variableInsertionRequestIdRef.current += 1;
 
     return {
       id: variableInsertionRequestIdRef.current,
-      variableKey,
+      text,
     };
   };
 
@@ -337,10 +409,33 @@ export default function TemplateFormScreen({
     void formik.setFieldValue('signature', nextSelection.nextValue);
   };
 
-  const handleVariableInsert = (variableKey: string) => {
+  const handleVariableInsert = (option: TemplateVariableOption) => {
+    if (option.insertBehavior === 'documentShareLinkCta') {
+      const ctaLabel = getDocumentShareLinkCtaLabel(
+        formik.values.templateType === 'ACCOUNTING_DOCUMENTS'
+          ? formik.values.documentSubtype || undefined
+          : undefined,
+      );
+
+      setActiveVariableTarget('body');
+      setPendingBodyVariableInsertion(
+        createVariableInsertionRequest(
+          buildTemplateCtaToken({
+            label: ctaLabel,
+            url: getTemplateVariableToken(option.value),
+          }),
+        ),
+      );
+      return;
+    }
+
+    const variableKey = option.value;
+
     switch (activeVariableTarget) {
       case 'body':
-        setPendingBodyVariableInsertion(createVariableInsertionRequest(variableKey));
+        setPendingBodyVariableInsertion(
+          createVariableInsertionRequest(getTemplateVariableToken(variableKey)),
+        );
         return;
       case 'signature':
         insertSignatureVariable(variableKey);
@@ -365,6 +460,7 @@ export default function TemplateFormScreen({
         body: true,
         signature: true,
         templateType: true,
+        documentSubtype: formik.values.templateType === 'ACCOUNTING_DOCUMENTS',
       });
       return;
     }
@@ -382,6 +478,7 @@ export default function TemplateFormScreen({
         body: true,
         signature: true,
         templateType: true,
+        documentSubtype: formik.values.templateType === 'ACCOUNTING_DOCUMENTS',
       });
       return;
     }
@@ -458,7 +555,15 @@ export default function TemplateFormScreen({
                 name='templateType'
                 className='select-input'
                 value={formik.values.templateType}
-                onChange={formik.handleChange}
+                onChange={(event) => {
+                  const nextTemplateType = event.target.value as TemplateFormValues['templateType'];
+
+                  void formik.setFieldValue('templateType', nextTemplateType);
+
+                  if (nextTemplateType !== 'ACCOUNTING_DOCUMENTS') {
+                    void formik.setFieldValue('documentSubtype', '');
+                  }
+                }}
                 onBlur={formik.handleBlur}
                 aria-label='Category'
               >
@@ -472,6 +577,35 @@ export default function TemplateFormScreen({
                 <div className='field-error'>{formik.errors.templateType}</div>
               ) : null}
             </div>
+
+            {formik.values.templateType === 'ACCOUNTING_DOCUMENTS' ? (
+              <div className='field-group'>
+                <label className='field-label' htmlFor='documentSubtype'>
+                  Document subtype
+                  <span>*</span>
+                </label>
+                <p className='helper-text'>Choose the accounting document type for this template.</p>
+                <select
+                  id='documentSubtype'
+                  name='documentSubtype'
+                  className='select-input'
+                  value={formik.values.documentSubtype}
+                  onChange={formik.handleChange}
+                  onBlur={formik.handleBlur}
+                  aria-label='Document subtype'
+                >
+                  <option value=''>Select subtype</option>
+                  {ACCOUNTING_DOCUMENT_SUBTYPE_KEYS.map((documentSubtype) => (
+                    <option key={documentSubtype} value={documentSubtype}>
+                      {ACCOUNTING_DOCUMENT_SUBTYPES[documentSubtype].label}
+                    </option>
+                  ))}
+                </select>
+                {formik.touched.documentSubtype && formik.errors.documentSubtype ? (
+                  <div className='field-error'>{formik.errors.documentSubtype}</div>
+                ) : null}
+              </div>
+            ) : null}
 
             <div className='field-group'>
               <label className='field-label' htmlFor='name'>
@@ -497,6 +631,7 @@ export default function TemplateFormScreen({
               <TemplateVariableMenuButton
                 buttonLabel='Add variable'
                 buttonAriaLabel='Add variable'
+                options={variableCatalog.options}
                 disabled={!activeVariableTarget}
                 onSelect={handleVariableInsert}
               />
@@ -602,9 +737,11 @@ export default function TemplateFormScreen({
         <aside className='template-preview-panel'>
           <h2 className='template-preview-title'>Email preview</h2>
           <TemplateEmailPreview
+            templateType={formik.values.templateType}
             subject={formik.values.subject}
             body={previewBody}
             signature={formik.values.signature}
+            variableOptions={variableCatalog.options}
           />
         </aside>
       </div>

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createTemplate, listTemplates, getTemplateById, updateTemplate } from '@/server/templates/service';
+import { TemplatePayloadValidationError } from '@/server/templates/errors';
 import { GET as getTemplates, POST as postTemplate } from '../route';
 import { GET as getTemplate, PATCH as patchTemplate } from '../[id]/route';
 
@@ -96,6 +97,31 @@ describe('templates API routes', () => {
     });
   });
 
+  it('returns a 400 JSON error payload for validation failures on create', async () => {
+    vi.mocked(createTemplate).mockRejectedValue(
+      new TemplatePayloadValidationError('CTA buttons can only be used in the email body'),
+    );
+
+    const response = await postTemplate(
+      new Request('http://localhost/api/templates?isPublished=true', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: 'New template',
+          subject: 'Hello',
+          body: 'World',
+        }),
+        headers: {
+          'content-type': 'application/json',
+        },
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      message: 'CTA buttons can only be used in the email body',
+    });
+  });
+
   it('gets one template by id', async () => {
     vi.mocked(getTemplateById).mockResolvedValue({
       _id: 'template-3',
@@ -186,6 +212,36 @@ describe('templates API routes', () => {
     expect(response.status).toBe(500);
     expect(await response.json()).toEqual({
       message: 'MONGODB_URI is required',
+    });
+  });
+
+  it('returns a 400 JSON error payload for validation failures on patch', async () => {
+    vi.mocked(updateTemplate).mockRejectedValue(
+      new TemplatePayloadValidationError('Invalid CTA button'),
+    );
+
+    const response = await patchTemplate(
+      new Request('http://localhost/api/templates/template-4?isPublished=true', {
+        method: 'PATCH',
+        body: JSON.stringify({
+          name: 'Published template',
+          subject: 'Updated',
+          body: 'Updated body',
+        }),
+        headers: {
+          'content-type': 'application/json',
+        },
+      }),
+      {
+        params: Promise.resolve({
+          id: 'template-4',
+        }),
+      },
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      message: 'Invalid CTA button',
     });
   });
 });

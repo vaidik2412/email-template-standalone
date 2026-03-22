@@ -2,18 +2,22 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 
+import type { TemplateVariableOption } from '@/types/templateVariable';
+
 import TemplateVariableMenu from './TemplateVariableMenu';
 
 type TemplateVariableMenuButtonProps = {
   buttonLabel: string;
   buttonAriaLabel: string;
-  onSelect: (variableKey: string) => void;
+  options: TemplateVariableOption[];
+  onSelect: (option: TemplateVariableOption) => void;
   disabled?: boolean;
 };
 
 export default function TemplateVariableMenuButton({
   buttonLabel,
   buttonAriaLabel,
+  options,
   onSelect,
   disabled = false,
 }: TemplateVariableMenuButtonProps) {
@@ -57,9 +61,10 @@ export default function TemplateVariableMenuButton({
       {isOpen ? (
         <div className='template-variable-inline-popover'>
           <TemplateVariableMenu
-            onSelect={(variableKey) => {
+            options={options}
+            onSelect={(option) => {
               setIsOpen(false);
-              onSelect(variableKey);
+              onSelect(option);
             }}
           />
         </div>
