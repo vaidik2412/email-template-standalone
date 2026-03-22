@@ -32,6 +32,9 @@ describe('TemplateWhatsappPreview', () => {
     );
 
     expect(screen.getByText(/whatsapp preview/i)).toBeInTheDocument();
+    expect(screen.getByText('Refrens')).toBeInTheDocument();
+    expect(screen.getByText(/tap here to add to contacts/i)).toBeInTheDocument();
+    expect(screen.getByText(/message/i)).toBeInTheDocument();
     expect(screen.getByText('Hello Rahul Mehta')).toBeInTheDocument();
   });
 
@@ -57,10 +60,11 @@ describe('TemplateWhatsappPreview', () => {
     );
 
     expect(
-      screen.getByRole('link', {
-        name: /share\.refrens\.local\/invoices\/inv-2026-001/i,
+      screen.getByRole('button', {
+        name: /view invoice/i,
       }),
-    ).toHaveAttribute('href', 'https://share.refrens.local/invoices/INV-2026-001');
+    ).toBeInTheDocument();
+    expect(screen.getByText(/5:25 pm/i)).toBeInTheDocument();
   });
 
   it('surfaces unsupported email CTA tokens with a whatsapp-specific hint', () => {
@@ -74,9 +78,7 @@ describe('TemplateWhatsappPreview', () => {
       />,
     );
 
-    expect(
-      screen.getByText(/buttons aren't supported in whatsapp templates yet/i),
-    ).toBeInTheDocument();
-    expect(screen.getByText(/replace this with \{\{document\.share_link\}\}/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /view document/i })).toBeInTheDocument();
+    expect(screen.queryByText(/buttons aren't supported in whatsapp templates yet/i)).not.toBeInTheDocument();
   });
 });
