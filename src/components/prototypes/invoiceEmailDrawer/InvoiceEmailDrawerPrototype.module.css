@@ -1,0 +1,647 @@
+.page {
+  min-height: 100vh;
+  background: #f3f5f9;
+  color: #2f3945;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.appShell {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 0 14px;
+  background: #f1f3f7;
+  border-right: 1px solid #e3e7ee;
+}
+
+.sidebarBrand,
+.sidebarInvite {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  font-size: 18px;
+  font-weight: 700;
+  color: #ffffff;
+  background: linear-gradient(180deg, #9c6bff 0%, #7b3eff 100%);
+}
+
+.sidebarIcons {
+  display: grid;
+  gap: 18px;
+}
+
+.sidebarIcon {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  color: #495360;
+  font-size: 16px;
+}
+
+.workspace {
+  position: relative;
+  min-width: 0;
+}
+
+.topBar {
+  display: flex;
+  align-items: center;
+  height: 72px;
+  padding: 0 26px;
+  background: #5a239d;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.topBarLeft {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #ffffff;
+}
+
+.menuIcon {
+  font-size: 18px;
+  opacity: 0.85;
+}
+
+.logoMark {
+  font-size: 18px;
+}
+
+.logoText {
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.workspaceContent {
+  min-height: calc(100vh - 72px);
+  padding: 0 52px 48px;
+  transition: filter 160ms ease, opacity 160ms ease;
+}
+
+.workspaceDimmed {
+  filter: grayscale(0.08);
+}
+
+.screenHeader {
+  padding: 12px 0 22px;
+}
+
+.screenMeta {
+  margin: 0;
+  font-size: 16px;
+  line-height: 24px;
+  color: #2f3945;
+}
+
+.pageBanner {
+  margin-bottom: 16px;
+  border: 1px solid #f4c2c2;
+  border-radius: 12px;
+  padding: 14px 16px;
+  background: #fff5f5;
+  color: #9b1c1c;
+}
+
+.tableCard {
+  overflow: hidden;
+  border: 1px solid #dce0e3;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 2px 8px rgba(20, 28, 39, 0.06);
+}
+
+.tableHeader,
+.tableRow {
+  display: grid;
+  grid-template-columns: 52px 160px 1.05fr 1.2fr 120px 150px 120px;
+  align-items: center;
+  column-gap: 14px;
+}
+
+.tableHeader {
+  min-height: 60px;
+  padding: 0 18px;
+  background: #ffffff;
+  border-bottom: 1px solid #eef2f5;
+  font-size: 14px;
+  font-weight: 500;
+  color: #686f78;
+}
+
+.tableBody {
+  display: grid;
+}
+
+.tableRow {
+  min-height: 128px;
+  width: 100%;
+  padding: 0 18px;
+  border: 0;
+  border-bottom: 1px solid #eef2f5;
+  background: #ffffff;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.tableRow:hover {
+  background: #fafbff;
+}
+
+.tableRowActive {
+  background: #f7f3fd;
+  box-shadow: inset 3px 0 0 #7b3eff;
+}
+
+.rowIndex {
+  justify-self: center;
+  font-size: 18px;
+  color: #495360;
+}
+
+.rowDate,
+.rowInvoice,
+.rowCustomer,
+.rowCurrency,
+.rowAmount {
+  font-size: 18px;
+  line-height: 28px;
+  letter-spacing: -0.01em;
+  color: #2f3945;
+}
+
+.rowCustomer {
+  max-width: 220px;
+}
+
+.statusPill {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  min-width: 76px;
+  min-height: 30px;
+  padding: 0 14px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.statusUnpaid {
+  background: #d08f24;
+  color: #ffffff;
+}
+
+.statusPaid {
+  background: #009d40;
+  color: #ffffff;
+}
+
+.statusPartPaid {
+  background: #4c7fc0;
+  color: #ffffff;
+}
+
+.statusOther {
+  background: #e8eaed;
+  color: #495360;
+}
+
+.tableEmpty {
+  padding: 24px;
+  font-size: 15px;
+  color: #686f78;
+}
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(47, 57, 69, 0.34);
+}
+
+.drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  width: min(808px, 100vw);
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  border-left: 1px solid #eff2f6;
+  box-shadow: -4px 0 24px rgba(20, 28, 39, 0.12);
+}
+
+.drawerHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 72px;
+  padding: 0 18px 0 16px;
+  border-bottom: 1px solid #eff2f6;
+}
+
+.drawerTitle {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: #2f3945;
+}
+
+.closeButton {
+  border: 0;
+  background: transparent;
+  color: #68727d;
+  font-size: 34px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.drawerBody {
+  flex: 1;
+  overflow-y: auto;
+  padding: 18px 18px 20px;
+}
+
+.drawerBannerError,
+.drawerBannerInfo {
+  margin-bottom: 16px;
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.drawerBannerError {
+  border: 1px solid #f7caca;
+  background: #fff4f4;
+  color: #9b1c1c;
+}
+
+.drawerBannerInfo {
+  border: 1px solid #ddd5ff;
+  background: #f7f3fd;
+  color: #5a239d;
+}
+
+.fieldRow {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  align-items: start;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.fieldLabelBlock {
+  padding-top: 11px;
+}
+
+.fieldLabel {
+  display: inline-block;
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 24px;
+  color: #2f3945;
+}
+
+.fieldSecondaryLabel {
+  display: block;
+  margin-top: 2px;
+  font-size: 14px;
+  line-height: 20px;
+  color: #8b95a1;
+}
+
+.fieldControlStack {
+  display: grid;
+  gap: 8px;
+}
+
+.textField,
+.selectField,
+.textArea {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #dce0e3;
+  border-radius: 8px;
+  background: #ffffff;
+  font: inherit;
+  color: #2f3945;
+  outline: none;
+}
+
+.textField,
+.selectField {
+  min-height: 46px;
+  padding: 10px 14px;
+}
+
+.selectField {
+  appearance: auto;
+}
+
+.textField:focus,
+.selectField:focus,
+.textArea:focus {
+  border-color: #7b3eff;
+  box-shadow: 0 0 0 3px rgba(123, 62, 255, 0.1);
+}
+
+.textField:disabled,
+.selectField:disabled,
+.textArea:disabled {
+  background: #f7f9fa;
+  color: #8b95a1;
+}
+
+.helperText {
+  margin: 0;
+  font-size: 13px;
+  line-height: 20px;
+  color: #8b95a1;
+}
+
+.chipField {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 46px;
+  padding: 8px 12px;
+  border: 1px solid #dce0e3;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.ccChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 2px;
+  background: #ebebeb;
+  font-size: 14px;
+  line-height: 20px;
+  color: #2f3945;
+}
+
+.ccChipClose {
+  font-size: 18px;
+  line-height: 1;
+  color: #495360;
+}
+
+.inlineLinkButton {
+  justify-self: end;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: #7b3eff;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.inlineLinkButton:disabled {
+  color: #c2b8e8;
+  cursor: default;
+}
+
+.messageSection {
+  margin-top: 4px;
+  margin-bottom: 18px;
+}
+
+.messageHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.textArea {
+  min-height: 340px;
+  padding: 14px 14px;
+  resize: vertical;
+  line-height: 1.45;
+}
+
+.attachmentNote {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+  border-radius: 12px;
+  padding: 12px 16px;
+  background: #f7f7f8;
+  color: #495360;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.noteIcon {
+  font-size: 18px;
+}
+
+.checkboxRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  font-size: 14px;
+  line-height: 20px;
+  color: #2f3945;
+}
+
+.checkboxRow input {
+  width: 20px;
+  height: 20px;
+  accent-color: #7b3eff;
+}
+
+.checkboxGroup {
+  margin-bottom: 12px;
+}
+
+.receiptHint {
+  margin: 10px 0 0 30px;
+  font-size: 14px;
+  line-height: 20px;
+  color: #495360;
+}
+
+.drawerFooter {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border-top: 1px solid #eff2f6;
+  background: #ffffff;
+}
+
+.primaryButton,
+.secondaryButton,
+.tertiaryButton {
+  min-height: 50px;
+  border-radius: 8px;
+  padding: 0 22px;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.primaryButton {
+  border: 0;
+  background: linear-gradient(90deg, #8e40ff 0%, #7b3eff 100%);
+  color: #ffffff;
+}
+
+.secondaryButton {
+  border: 1px solid #7b3eff;
+  background: #ffffff;
+  color: #7b3eff;
+}
+
+.tertiaryButton {
+  border: 1px solid #dce0e3;
+  background: #ffffff;
+  color: #686f78;
+}
+
+.primaryButton:disabled,
+.secondaryButton:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.previewOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  background: rgba(33, 39, 48, 0.42);
+}
+
+.previewCard {
+  width: min(720px, calc(100vw - 32px));
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 20px 60px rgba(20, 28, 39, 0.18);
+}
+
+.previewHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px;
+  border-bottom: 1px solid #eef2f5;
+}
+
+.previewTitle {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.previewBody {
+  padding: 20px;
+}
+
+.previewMeta {
+  margin: 0 0 12px;
+  font-size: 14px;
+  line-height: 20px;
+  color: #495360;
+}
+
+.previewMessage {
+  margin: 0;
+  white-space: pre-wrap;
+  font: inherit;
+  font-size: 15px;
+  line-height: 24px;
+  color: #2f3945;
+}
+
+@media (max-width: 1280px) {
+  .workspaceContent {
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+
+  .tableHeader,
+  .tableRow {
+    grid-template-columns: 44px 132px 1fr 1fr 94px 112px 100px;
+  }
+}
+
+@media (max-width: 980px) {
+  .appShell {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    display: none;
+  }
+
+  .drawer {
+    width: 100vw;
+  }
+
+  .fieldRow {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .fieldLabelBlock {
+    padding-top: 0;
+  }
+}
+
+@media (max-width: 720px) {
+  .workspaceContent {
+    padding: 0 12px 24px;
+  }
+
+  .topBar {
+    padding: 0 16px;
+  }
+
+  .tableCard {
+    overflow-x: auto;
+  }
+
+  .tableHeader,
+  .tableRow {
+    min-width: 760px;
+  }
+
+  .drawerBody {
+    padding: 14px;
+  }
+
+  .drawerFooter {
+    flex-wrap: wrap;
+  }
+
+  .primaryButton,
+  .secondaryButton,
+  .tertiaryButton {
+    width: 100%;
+  }
+}

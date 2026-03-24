@@ -44,6 +44,21 @@ export default function HomePage() {
         >
           Email Templates Dashboard
         </Link>
+        <Link
+          href='/prototypes/invoice-email-drawer'
+          style={{
+            display: 'inline-flex',
+            marginTop: '12px',
+            marginLeft: '12px',
+            padding: '14px 18px',
+            borderRadius: '999px',
+            background: '#0f172a',
+            color: 'white',
+            fontWeight: 600,
+          }}
+        >
+          Invoice Email Drawer Prototype
+        </Link>
       </div>
     </main>
   );
