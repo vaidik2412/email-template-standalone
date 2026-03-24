@@ -22,20 +22,26 @@ describe('TemplateWhatsappPreview', () => {
     },
   ];
 
-  it('renders resolved variables inside the whatsapp message bubble', () => {
-    render(
+  it('renders resolved variables inside a single template card within the figma-style whatsapp shell', () => {
+    const { container } = render(
       <TemplateWhatsappPreview
         templateType='SALES_CRM'
-        body='Hello {{contact.name}}'
+        body={'Hello {{contact.name}}\n\nPlease review the updated details.'}
         variableOptions={variableOptions}
       />,
     );
 
     expect(screen.getByText(/whatsapp preview/i)).toBeInTheDocument();
-    expect(screen.getByText('Refrens')).toBeInTheDocument();
-    expect(screen.getByText(/tap here to add to contacts/i)).toBeInTheDocument();
+    expect(screen.getByText('Martha Craig')).toBeInTheDocument();
+    expect(screen.getByText(/tap here for contact info/i)).toBeInTheDocument();
+    expect(screen.getByText(/fri, jul 26/i)).toBeInTheDocument();
     expect(screen.getByText(/message/i)).toBeInTheDocument();
     expect(screen.getByText('Hello Rahul Mehta')).toBeInTheDocument();
+    expect(screen.getByText('Please review the updated details.')).toBeInTheDocument();
+
+    const cards = container.querySelectorAll('.template-whatsapp-template-card');
+    expect(cards).toHaveLength(1);
+    expect(cards[0]?.querySelectorAll('.template-whatsapp-template-paragraph')).toHaveLength(2);
   });
 
   it('shows an empty state when no whatsapp message has been written yet', () => {
@@ -50,8 +56,8 @@ describe('TemplateWhatsappPreview', () => {
     expect(screen.getByText(/start writing to preview this whatsapp message/i)).toBeInTheDocument();
   });
 
-  it('renders plain share links as tappable link cards', () => {
-    render(
+  it('renders plain share links as the footer action of the same template card', () => {
+    const { container } = render(
       <TemplateWhatsappPreview
         templateType='ACCOUNTING_DOCUMENTS'
         body='Please review your invoice\n{{document.share_link}}'
@@ -65,6 +71,7 @@ describe('TemplateWhatsappPreview', () => {
       }),
     ).toBeInTheDocument();
     expect(screen.getByText(/5:25 pm/i)).toBeInTheDocument();
+    expect(container.querySelectorAll('.template-whatsapp-template-card')).toHaveLength(1);
   });
 
   it('surfaces unsupported email CTA tokens with a whatsapp-specific hint', () => {
