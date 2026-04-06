@@ -2,6 +2,7 @@ import { Types } from 'mongoose';
 
 import type { DocumentTemplateSubtypeKey } from '@/data/email/documentSubtypes';
 import { DEFAULT_EMAIL_TEMPLATES } from '@/data/email/defaultTemplates';
+import { DEFAULT_WHATSAPP_TEMPLATES } from '@/data/whatsapp/defaultTemplates';
 import type {
   SerializedMessageTemplate,
   TemplateListResponse,
@@ -53,6 +54,10 @@ function sanitizeTemplateWritePayload(payload: TemplateWritePayload) {
     sanitized.isRemoved = payload.isRemoved;
   }
 
+  if (payload.whatsapp && typeof payload.whatsapp === 'object') {
+    sanitized.whatsapp = payload.whatsapp;
+  }
+
   return sanitized;
 }
 
@@ -99,6 +104,22 @@ function serializeTemplate(template: any): SerializedMessageTemplate {
       ? {
           by: template.removed.by.toString(),
           reason: template.removed.reason,
+        }
+      : undefined,
+    whatsapp: template.whatsapp
+      ? {
+          template: template.whatsapp.template,
+          variables: template.whatsapp.variables,
+          category: template.whatsapp.category,
+          language: template.whatsapp.language,
+          header: template.whatsapp.header,
+          footer: template.whatsapp.footer,
+          button: template.whatsapp.button,
+          campaign: template.whatsapp.campaign,
+          integrationId: template.whatsapp.integrationId?.toString(),
+          number: template.whatsapp.number,
+          media: template.whatsapp.media,
+          status: template.whatsapp.status,
         }
       : undefined,
     createdAt: new Date(template.createdAt).toISOString(),
@@ -149,9 +170,53 @@ async function ensureDefaultTemplates() {
   await MessageTemplate.insertMany(payload);
 }
 
+async function ensureDefaultWhatsappTemplates() {
+  const MessageTemplate = getMessageTemplateModel();
+  const visibleWhatsappCount = await MessageTemplate.countDocuments({
+    ...getVisibleTemplateQuery(),
+    channel: 'WHATSAPP',
+  });
+
+  if (visibleWhatsappCount > 0) {
+    return;
+  }
+
+  const existingDefaultTemplate = await MessageTemplate.findOne({
+    ...getTemplateScopeQuery(),
+    channel: 'WHATSAPP',
+    isDefault: true,
+  }).lean();
+
+  if (existingDefaultTemplate?._id) {
+    return;
+  }
+
+  const businessId = new Types.ObjectId(FIXED_APP_CONTEXT.business.id);
+  const actorId = FIXED_APP_CONTEXT.user.id;
+  const userId = new Types.ObjectId(actorId);
+
+  const payload = DEFAULT_WHATSAPP_TEMPLATES.map((template) =>
+    applyTemplateMutation(
+      {
+        ...template,
+        channel: 'WHATSAPP' as const,
+        business: businessId,
+        createdBy: userId,
+      },
+      {
+        actorId,
+        isPublished: true,
+      },
+    ),
+  );
+
+  await MessageTemplate.insertMany(payload);
+}
+
 export async function listTemplates(): Promise<TemplateListResponse> {
   await connectToDatabase();
   await ensureDefaultTemplates();
+  await ensureDefaultWhatsappTemplates();
 
   const MessageTemplate = getMessageTemplateModel();
   const templates = await MessageTemplate.find(getVisibleTemplateQuery()).sort({ updatedAt: -1 }).lean();

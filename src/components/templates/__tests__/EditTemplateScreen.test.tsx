@@ -145,7 +145,9 @@ describe('TemplateFormScreen in edit mode', () => {
       expect(screen.getByDisplayValue('WhatsApp reminder')).toBeInTheDocument();
     });
 
-    expect(screen.getByLabelText(/channel/i)).toBeDisabled();
+    const whatsappRadio = screen.getByRole('radio', { name: /whatsapp/i });
+    expect(whatsappRadio).toBeChecked();
+    expect(whatsappRadio).toBeDisabled();
     expect(screen.queryByLabelText(/email subject/i)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/email signature/i)).not.toBeInTheDocument();
     expect(screen.getByLabelText(/whatsapp message/i)).toHaveValue('Hello {{contact.name}}');

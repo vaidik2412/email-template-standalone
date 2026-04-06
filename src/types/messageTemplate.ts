@@ -41,6 +41,20 @@ export type SerializedMessageTemplate = {
     by?: string;
     reason?: string;
   };
+  whatsapp?: {
+    template?: { id?: string; name?: string };
+    variables?: string[];
+    category?: 'MARKETING' | 'UTILITY';
+    language?: string;
+    header?: string;
+    footer?: string;
+    button?: { label?: string; url?: string };
+    campaign?: { id?: string; name?: string };
+    integrationId?: string;
+    number?: string;
+    media?: { urlPath?: string; filenamePath?: string };
+    status?: string;
+  };
   createdAt: string;
   updatedAt: string;
 };
@@ -54,6 +68,16 @@ export type TemplateWritePayload = {
   documentSubtype?: DocumentTemplateSubtypeKey;
   isArchived?: boolean;
   isRemoved?: boolean;
+  whatsapp?: {
+    category?: 'MARKETING' | 'UTILITY';
+    language?: string;
+    header?: string;
+    footer?: string;
+    button?: {
+      label: string;
+      url: string;
+    };
+  };
 };
 
 export type TemplateListResponse = {

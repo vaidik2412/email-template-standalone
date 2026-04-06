@@ -12,6 +12,11 @@ type AiGeneratedResult = {
   channel: 'EMAIL' | 'WHATSAPP';
   templateType: EmailTemplateTypeKey;
   documentSubtype?: DocumentTemplateSubtypeKey;
+  whatsappCategory?: 'MARKETING' | 'UTILITY';
+  whatsappLanguage?: string;
+  whatsappHeader?: string;
+  whatsappFooter?: string;
+  whatsappButton?: { label: string; url: string };
 };
 
 type AiTemplatePromptProps = {

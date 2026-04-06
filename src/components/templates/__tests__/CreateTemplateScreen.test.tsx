@@ -352,9 +352,7 @@ describe('TemplateFormScreen in create mode', () => {
 
     render(<TemplateFormScreen mode='create' />);
 
-    fireEvent.change(screen.getByLabelText(/channel/i), {
-      target: { value: 'WHATSAPP' },
-    });
+    fireEvent.click(screen.getByRole('radio', { name: /whatsapp/i }));
 
     const messageField = await screen.findByLabelText(/whatsapp message/i);
 
@@ -389,33 +387,23 @@ describe('TemplateFormScreen in create mode', () => {
       name: 'WhatsApp reminder',
       body: 'Hello {{contact.name}}',
       templateType: 'SALES_CRM',
+      whatsapp: {
+        category: 'MARKETING',
+        language: 'en',
+      },
     });
     expect(payload).not.toHaveProperty('subject');
   });
 
-  it('inserts document share links as plain variables in whatsapp mode', async () => {
+  it('inserts document share links into whatsapp button fields', async () => {
     render(<TemplateFormScreen mode='create' />);
 
-    fireEvent.change(screen.getByLabelText(/channel/i), {
-      target: { value: 'WHATSAPP' },
-    });
-    fireEvent.change(screen.getByLabelText(/category/i), {
+    fireEvent.click(screen.getByRole('radio', { name: /whatsapp/i }));
+    fireEvent.change(screen.getByLabelText('Category'), {
       target: { value: 'ACCOUNTING_DOCUMENTS' },
     });
     fireEvent.change(await screen.findByLabelText(/document subtype/i), {
       target: { value: 'INVOICE' },
-    });
-
-    const messageField = screen.getByLabelText(/whatsapp message/i) as HTMLTextAreaElement;
-
-    await act(async () => {
-      fireEvent.change(messageField, {
-        target: { value: 'Hi there\n\n' },
-      });
-
-      messageField.focus();
-      messageField.setSelectionRange(messageField.value.length, messageField.value.length);
-      fireEvent.select(messageField);
     });
 
     await act(async () => {
@@ -427,7 +415,8 @@ describe('TemplateFormScreen in create mode', () => {
     });
 
     await waitFor(() => {
-      expect(messageField).toHaveValue('Hi there\n\n{{document.share_link}}');
+      expect(screen.getByLabelText(/button label/i)).toHaveValue('View Invoice');
+      expect(screen.getByLabelText(/button url/i)).toHaveValue('{{document.share_link}}');
     });
   });
 

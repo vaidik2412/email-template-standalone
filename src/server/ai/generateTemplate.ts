@@ -8,6 +8,7 @@ import {
   ACCOUNTING_DOCUMENT_SUBTYPE_KEYS,
   type DocumentTemplateSubtypeKey,
 } from '@/data/email/documentSubtypes';
+import { isValidWhatsappLanguage } from '@/data/whatsapp/languages';
 
 export type GenerateTemplateInput = {
   description: string;
@@ -21,6 +22,11 @@ export type GenerateTemplateResult = {
   channel: 'EMAIL' | 'WHATSAPP';
   templateType: EmailTemplateTypeKey;
   documentSubtype?: DocumentTemplateSubtypeKey;
+  whatsappCategory?: 'MARKETING' | 'UTILITY';
+  whatsappLanguage?: string;
+  whatsappHeader?: string;
+  whatsappFooter?: string;
+  whatsappButton?: { label: string; url: string };
 };
 
 function buildCategoryReference() {
@@ -103,7 +109,7 @@ ${docVars}
 - Variable tokens use the format {{variable.name}} — include the double curly braces.
 - Keep the tone professional but friendly.
 - If channel is EMAIL: body uses markdown. CRITICAL formatting rules: (1) Use \\n\\n (double newline) between paragraphs — single \\n collapses into one line. (2) For field details, use a bullet list with bold labels. Put a blank line before the first bullet. Example in JSON: "Here are the details:\\n\\n- **Invoice Number:** {{document.number}}\\n- **Invoice Date:** {{document.date}}\\n- **Due Date:** {{document.due_date}}\\n\\nNext paragraph here." — this renders as a proper bulleted list with bold labels.
-- If channel is WHATSAPP: body must be plain text only (under 1024 chars), no markdown, no bold, no bullets.
+- If channel is WHATSAPP: body must be plain text only (under 1024 chars), no markdown, no bold. Do NOT use {{cta ...}} tokens in the WhatsApp body — buttons are handled via the separate "whatsappButton" field.
 - Template name should be short and descriptive (3-6 words).
 - If channel is EMAIL: subject line should be concise and include relevant variables. If channel is WHATSAPP: set "subject" to empty string.
 - Do NOT include a signature, sign-off, or closing (like "Best regards", "Thank you", sender name, phone, email) in the body. The app has a SEPARATE signature field that is automatically appended — anything you put in the body will be duplicated.
@@ -114,27 +120,60 @@ ${docVars}
 When generating templates for accounting documents (invoices, quotations, purchase orders, etc.):
 - ALWAYS present document details as a bulleted list with bold labels. This applies to BOTH email and WhatsApp channels.
 - For EMAIL, use markdown bullets: "\\n\\n- **Invoice Number:** {{document.number}}\\n- **Invoice Date:** {{document.date}}\\n- **Due Date:** {{document.due_date}}\\n- **Total Amount:** {{document.currency}} {{document.total}}\\n\\n"
-- For WHATSAPP, use plain text bullets with emoji/dash: "\\n\\n- Invoice Number: {{document.number}}\\n- Invoice Date: {{document.date}}\\n- Due Date: {{document.due_date}}\\n- Total Amount: {{document.currency}} {{document.total}}\\n\\n"
+- For WHATSAPP, use plain text bullets with dash: "\\n\\n- Invoice Number: {{document.number}}\\n- Invoice Date: {{document.date}}\\n- Due Date: {{document.due_date}}\\n- Total Amount: {{document.currency}} {{document.total}}\\n\\n"
 - If amount due/paid tokens are available for the subtype, include them as additional bullet items.
 - ALWAYS put currency BEFORE amount: {{document.currency}} {{document.total}}, {{document.currency}} {{document.amount_due}}, etc. Never the other way round.
-- ALWAYS include a CTA button for the document share link. Do NOT use {{document.share_link}} as plain text. Use this exact CTA token format:
-  {{cta label="View Invoice" url="{{document.share_link}}" bg="#7d42df" text="#ffffff"}}
-  Adjust the label to match the document type (e.g. "View Quotation", "View Purchase Order", "View Credit Note").
-  This CTA format works for BOTH email and WhatsApp channels. For WhatsApp, the app will translate it to Meta's call_to_action button format before submission.
+- For the document share link, the format DEPENDS on the channel:
+  - If channel is EMAIL: Use this CTA button token in the body (do NOT use {{document.share_link}} as plain text):
+    {{cta label="View Invoice" url="{{document.share_link}}" bg="#7d42df" text="#ffffff"}}
+    Adjust the label to match the document type (e.g. "View Quotation", "View Purchase Order", "View Credit Note").
+  - If channel is WHATSAPP: Do NOT put {{cta ...}} or {{document.share_link}} in the body. Instead, set the "whatsappButton" field with label and url. Example: {"label": "View Invoice", "url": "{{document.share_link}}"}
 - Address the customer by name using {{customer.name}}.
 - Mention your business name using {{business.name}}.
 
 ## Output Format
-Respond with ONLY a JSON object (no markdown fences, no explanation) in this exact shape:
+Respond with ONLY a JSON object (no markdown fences, no explanation).
+
+For EMAIL templates, use this shape:
 {
-  "channel": "EMAIL or WHATSAPP",
+  "channel": "EMAIL",
   "templateType": "SALES_CRM or ACCOUNTING_DOCUMENTS",
   "documentSubtype": "INVOICE, QUOTATION, etc. or null if SALES_CRM",
   "name": "Template Name Here",
-  "subject": "Subject line here (empty string for WhatsApp)",
+  "subject": "Subject line here",
   "body": "Body content here",
-  "signature": "Signature here (omit for WhatsApp)"
+  "signature": "Signature here"
 }
+
+For WHATSAPP templates, use this shape:
+{
+  "channel": "WHATSAPP",
+  "templateType": "SALES_CRM or ACCOUNTING_DOCUMENTS",
+  "documentSubtype": "INVOICE, QUOTATION, etc. or null if SALES_CRM",
+  "name": "Template Name Here",
+  "subject": "",
+  "body": "Body content here (plain text, no CTA tokens)",
+  "whatsappCategory": "MARKETING or UTILITY",
+  "whatsappLanguage": "en",
+  "whatsappHeader": "Optional short header (max 60 chars, supports one variable)",
+  "whatsappFooter": "Optional footer (max 60 chars, no variables)",
+  "whatsappButton": {"label": "Button text (max 20 chars)", "url": "{{document.share_link}}"}
+}
+
+## WhatsApp-Specific Rules
+- "whatsappCategory": Use "UTILITY" for transactional messages (invoices, receipts, order updates). Use "MARKETING" for promotional/sales outreach.
+- "whatsappLanguage": Default to "en". ONLY use one of these supported codes: en, hi, es, fr, de, pt_BR, ar, id, it, ja, ko, zh_CN. If the user writes in a language not in this list, default to "en". For mixed-language templates (e.g. Hindi + English), use the dominant language code.
+- "whatsappHeader": Optional. Short bold header shown above the message. Max 60 characters. Supports at most one variable. Good for document templates, e.g. "Invoice {{document.number}}". Omit or set to empty string if not needed.
+- "whatsappFooter": Optional. Muted text below the message. Max 60 characters. No variables allowed. Use plain text like "Powered by Refrens" or omit.
+- "whatsappButton": Optional. Set only when there's a meaningful action link (e.g. document share link). The "label" must be max 20 characters. Omit if not applicable (e.g. for a simple follow-up message).
+
+## Non-English Language Rules
+When writing templates in a non-English language:
+- NEVER translate document type names. Keep these ALWAYS in English: Invoice, Quotation, Purchase Order, Credit Note, Debit Note, Proforma Invoice, Payment Receipt, Delivery Challan, Sales Order.
+- Example (Hindi): "नमस्ते {{customer.name}}, आपका Invoice तैयार है।" — NOT "आपका चालान तैयार है।"
+- The field labels in bullet lists (Invoice Number, Invoice Date, Due Date, Total Amount, etc.) should also remain in English.
+- The surrounding conversational text should be in the requested language.
+- Mixed-language content (e.g. English + Hindi) is perfectly valid for both Email and WhatsApp templates.
 
 ## Signature Rules (EMAIL only, omit signature field for WHATSAPP)
 - The "signature" field is rendered in a SEPARATE block below the body — do NOT put any sign-off in the body.
@@ -199,7 +238,7 @@ Respond with ONLY a JSON object (no markdown fences, no explanation) in this exa
 
   const channel = parsed.channel === 'WHATSAPP' ? 'WHATSAPP' : 'EMAIL';
 
-  return {
+  const result: GenerateTemplateResult = {
     name: parsed.name,
     subject: parsed.subject || '',
     body: parsed.body,
@@ -208,4 +247,22 @@ Respond with ONLY a JSON object (no markdown fences, no explanation) in this exa
     templateType,
     documentSubtype,
   };
+
+  if (channel === 'WHATSAPP') {
+    const whatsappCategory = parsed.whatsappCategory === 'UTILITY' ? 'UTILITY' : 'MARKETING';
+    result.whatsappCategory = whatsappCategory;
+    const languageCode = parsed.whatsappLanguage || 'en';
+    result.whatsappLanguage = isValidWhatsappLanguage(languageCode) ? languageCode : 'en';
+    result.whatsappHeader = parsed.whatsappHeader || undefined;
+    result.whatsappFooter = parsed.whatsappFooter || undefined;
+
+    if (parsed.whatsappButton?.label && parsed.whatsappButton?.url) {
+      result.whatsappButton = {
+        label: parsed.whatsappButton.label,
+        url: parsed.whatsappButton.url,
+      };
+    }
+  }
+
+  return result;
 }

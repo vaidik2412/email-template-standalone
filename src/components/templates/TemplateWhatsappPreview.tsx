@@ -15,6 +15,10 @@ type TemplateWhatsappPreviewProps = {
   templateType: EmailTemplateTypeKey;
   body: string;
   variableOptions: TemplateVariableOption[];
+  header?: string;
+  footer?: string;
+  buttonLabel?: string;
+  buttonUrl?: string;
 };
 
 type WhatsappPreviewAction = {
@@ -366,6 +370,10 @@ export default function TemplateWhatsappPreview({
   templateType,
   body,
   variableOptions,
+  header,
+  footer,
+  buttonLabel,
+  buttonUrl,
 }: TemplateWhatsappPreviewProps) {
   const previewValues = useMemo(
     () => buildTemplatePreviewValueMap(variableOptions),
@@ -375,7 +383,30 @@ export default function TemplateWhatsappPreview({
     () => buildWhatsappPreviewModel(body, previewValues, templateType),
     [body, previewValues, templateType],
   );
-  const hasPreviewContent = previewModel.paragraphs.length > 0 || Boolean(previewModel.action);
+
+  const resolvedHeader = useMemo(
+    () => (header ? resolveTemplatePreviewText(header, previewValues).trim() : ''),
+    [header, previewValues],
+  );
+
+  const resolvedFooter = useMemo(
+    () => (footer ? footer.trim() : ''),
+    [footer],
+  );
+
+  const externalButton = useMemo(() => {
+    if (!buttonLabel?.trim() || !buttonUrl?.trim()) {
+      return null;
+    }
+    const resolvedUrl = resolveTemplatePreviewText(buttonUrl, previewValues).trim();
+    return {
+      label: resolveTemplatePreviewText(buttonLabel, previewValues).trim() || deriveActionLabel(resolvedUrl, templateType),
+      url: resolvedUrl,
+    };
+  }, [buttonLabel, buttonUrl, previewValues, templateType]);
+
+  const effectiveAction = externalButton || previewModel.action;
+  const hasPreviewContent = previewModel.paragraphs.length > 0 || Boolean(resolvedHeader) || Boolean(effectiveAction);
 
   return (
     <div className='template-preview-stack'>
@@ -434,12 +465,17 @@ export default function TemplateWhatsappPreview({
                   <div className='template-whatsapp-chat-date'>Fri, Jul 26</div>
 
                   <article className='template-whatsapp-template-card'>
+                    {resolvedHeader ? (
+                      <div className='template-whatsapp-template-header'>
+                        {resolvedHeader}
+                      </div>
+                    ) : null}
                     <div className='template-whatsapp-template-card-body'>
                       {previewModel.paragraphs.map((paragraph, index) => (
                         <p
                           key={`${paragraph}-${index}`}
                           className={
-                            index === 0
+                            index === 0 && !resolvedHeader
                               ? 'template-whatsapp-template-paragraph template-whatsapp-template-paragraph--lead'
                               : 'template-whatsapp-template-paragraph'
                           }
@@ -449,15 +485,21 @@ export default function TemplateWhatsappPreview({
                       ))}
                     </div>
 
+                    {resolvedFooter ? (
+                      <div className='template-whatsapp-template-footer'>
+                        {resolvedFooter}
+                      </div>
+                    ) : null}
+
                     <div className='template-whatsapp-template-meta'>
                       <span className='template-whatsapp-template-time'>5:25 PM</span>
                       <ReadIcon />
                     </div>
 
-                    {previewModel.action ? (
+                    {effectiveAction ? (
                       <button type='button' className='template-whatsapp-template-action'>
                         <ActionIcon />
-                        <span>{previewModel.action.label}</span>
+                        <span>{effectiveAction.label}</span>
                       </button>
                     ) : null}
                   </article>

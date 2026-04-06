@@ -86,6 +86,37 @@ const whatsappSchema = new Schema(
       type: String,
       default: 'PENDING',
     },
+    // Custom template fields (for user-authored WhatsApp templates)
+    category: {
+      type: String,
+      enum: ['MARKETING', 'UTILITY'],
+    },
+    language: {
+      type: String,
+      trim: true,
+      maxLength: 10,
+    },
+    header: {
+      type: String,
+      trim: true,
+      maxLength: 60,
+    },
+    footer: {
+      type: String,
+      trim: true,
+      maxLength: 60,
+    },
+    button: {
+      label: {
+        type: String,
+        trim: true,
+        maxLength: 20,
+      },
+      url: {
+        type: String,
+        trim: true,
+      },
+    },
   },
   {
     _id: false,

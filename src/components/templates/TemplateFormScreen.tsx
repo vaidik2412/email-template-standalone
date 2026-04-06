@@ -40,6 +40,7 @@ import type {
   TemplateVariableTarget,
 } from './templateVariableInsertion';
 import AiTemplatePrompt from './AiTemplatePrompt';
+import { WHATSAPP_LANGUAGES } from '@/data/whatsapp/languages';
 
 type TemplateFormScreenProps = {
   mode: 'create' | 'edit';
@@ -47,6 +48,8 @@ type TemplateFormScreenProps = {
   copyFromId?: string;
   indexedCustomFields?: IndexedCustomFieldsByCategory;
 };
+
+type WhatsappCategory = 'MARKETING' | 'UTILITY';
 
 type TemplateFormValues = {
   channel: SerializedMessageTemplate['channel'];
@@ -57,6 +60,12 @@ type TemplateFormValues = {
   templateType: (typeof ENABLED_EMAIL_TEMPLATE_TYPE_KEYS)[number];
   documentSubtype: DocumentTemplateSubtypeKey | '';
   isArchived: boolean;
+  whatsappCategory: WhatsappCategory;
+  whatsappLanguage: string;
+  whatsappHeader: string;
+  whatsappFooter: string;
+  whatsappButtonLabel: string;
+  whatsappButtonUrl: string;
 };
 
 const defaultValues: TemplateFormValues = {
@@ -68,6 +77,12 @@ const defaultValues: TemplateFormValues = {
   templateType: ENABLED_EMAIL_TEMPLATE_TYPE_KEYS[0],
   documentSubtype: '',
   isArchived: false,
+  whatsappCategory: 'MARKETING',
+  whatsappLanguage: 'en',
+  whatsappHeader: '',
+  whatsappFooter: '',
+  whatsappButtonLabel: '',
+  whatsappButtonUrl: '',
 };
 
 function getDuplicateValues(template: SerializedMessageTemplate): TemplateFormValues {
@@ -95,6 +110,12 @@ function getDuplicateValues(template: SerializedMessageTemplate): TemplateFormVa
     templateType: source.templateType,
     documentSubtype: source.documentSubtype || '',
     isArchived: false,
+    whatsappCategory: source.whatsapp?.category || 'MARKETING',
+    whatsappLanguage: source.whatsapp?.language || 'en',
+    whatsappHeader: source.whatsapp?.header || '',
+    whatsappFooter: source.whatsapp?.footer || '',
+    whatsappButtonLabel: source.whatsapp?.button?.label || '',
+    whatsappButtonUrl: source.whatsapp?.button?.url || '',
   };
 }
 
@@ -116,6 +137,12 @@ function getEditValues(template: SerializedMessageTemplate): TemplateFormValues 
     templateType: template.templateType,
     documentSubtype: template.documentSubtype || '',
     isArchived: template.isArchived,
+    whatsappCategory: template.whatsapp?.category || 'MARKETING',
+    whatsappLanguage: template.whatsapp?.language || 'en',
+    whatsappHeader: template.whatsapp?.header || '',
+    whatsappFooter: template.whatsapp?.footer || '',
+    whatsappButtonLabel: template.whatsapp?.button?.label || '',
+    whatsappButtonUrl: template.whatsapp?.button?.url || '',
   };
 }
 
@@ -311,6 +338,24 @@ export default function TemplateFormScreen({
         }
       }
 
+      if (values.channel === 'WHATSAPP') {
+        if (values.whatsappHeader && values.whatsappHeader.length > 60) {
+          errors.whatsappHeader = 'Header must be at most 60 characters.';
+        }
+        if (values.whatsappFooter && values.whatsappFooter.length > 60) {
+          errors.whatsappFooter = 'Footer must be at most 60 characters.';
+        }
+        if (values.whatsappButtonLabel && values.whatsappButtonLabel.length > 20) {
+          errors.whatsappButtonLabel = 'Button label must be at most 20 characters.';
+        }
+        if (values.whatsappButtonLabel && !values.whatsappButtonUrl) {
+          errors.whatsappButtonUrl = 'Button URL is required when a label is set.';
+        }
+        if (values.whatsappButtonUrl && !values.whatsappButtonLabel) {
+          errors.whatsappButtonLabel = 'Button label is required when a URL is set.';
+        }
+      }
+
       return errors;
     },
     onSubmit: async (values) => {
@@ -339,6 +384,8 @@ export default function TemplateFormScreen({
     const normalizedBody = removeMarkdownEditorsInternalVariables(values.body);
 
     if (values.channel === 'WHATSAPP') {
+      const hasButton = Boolean(values.whatsappButtonLabel?.trim() && values.whatsappButtonUrl?.trim());
+
       return {
         channel: values.channel,
         name: values.name,
@@ -349,6 +396,15 @@ export default function TemplateFormScreen({
             ? values.documentSubtype || undefined
             : undefined,
         isArchived: values.isArchived,
+        whatsapp: {
+          category: values.whatsappCategory,
+          language: values.whatsappLanguage,
+          header: values.whatsappHeader || undefined,
+          footer: values.whatsappFooter || undefined,
+          button: hasButton
+            ? { label: values.whatsappButtonLabel.trim(), url: values.whatsappButtonUrl.trim() }
+            : undefined,
+        },
       };
     }
 
@@ -460,10 +516,14 @@ export default function TemplateFormScreen({
   const handleVariableInsert = (option: TemplateVariableOption) => {
     if (option.insertBehavior === 'documentShareLinkCta') {
       if (formik.values.channel === 'WHATSAPP') {
-        setActiveVariableTarget('body');
-        setPendingBodyVariableInsertion(
-          createVariableInsertionRequest(getTemplateVariableToken(option.value)),
+        const ctaLabel = getDocumentShareLinkCtaLabel(
+          formik.values.templateType === 'ACCOUNTING_DOCUMENTS'
+            ? formik.values.documentSubtype || undefined
+            : undefined,
         );
+
+        void formik.setFieldValue('whatsappButtonLabel', ctaLabel);
+        void formik.setFieldValue('whatsappButtonUrl', getTemplateVariableToken(option.value));
         return;
       }
 
@@ -533,6 +593,11 @@ export default function TemplateFormScreen({
     channel: 'EMAIL' | 'WHATSAPP';
     templateType: (typeof ENABLED_EMAIL_TEMPLATE_TYPE_KEYS)[number];
     documentSubtype?: DocumentTemplateSubtypeKey;
+    whatsappCategory?: WhatsappCategory;
+    whatsappLanguage?: string;
+    whatsappHeader?: string;
+    whatsappFooter?: string;
+    whatsappButton?: { label: string; url: string };
   }) => {
     void formik.setFieldValue('channel', result.channel);
     void formik.setFieldValue('name', result.name);
@@ -547,6 +612,15 @@ export default function TemplateFormScreen({
       if (result.signature) {
         void formik.setFieldValue('signature', result.signature);
       }
+    }
+
+    if (result.channel === 'WHATSAPP') {
+      void formik.setFieldValue('whatsappCategory', result.whatsappCategory || 'MARKETING');
+      void formik.setFieldValue('whatsappLanguage', result.whatsappLanguage || 'en');
+      void formik.setFieldValue('whatsappHeader', result.whatsappHeader || '');
+      void formik.setFieldValue('whatsappFooter', result.whatsappFooter || '');
+      void formik.setFieldValue('whatsappButtonLabel', result.whatsappButton?.label || '');
+      void formik.setFieldValue('whatsappButtonUrl', result.whatsappButton?.url || '');
     }
   };
 
@@ -632,28 +706,45 @@ export default function TemplateFormScreen({
             ) : null}
 
             <div className='field-group'>
-              <label className='field-label' htmlFor='channel'>
+              <label className='field-label'>
                 Channel
                 <span>*</span>
               </label>
               <p className='helper-text'>Pick the delivery channel for this template.</p>
-              <select
-                id='channel'
-                name='channel'
-                className='select-input'
-                value={formik.values.channel}
-                disabled={mode === 'edit'}
-                onChange={(event) => {
-                  const nextChannel = event.target.value as TemplateFormValues['channel'];
-
-                  void formik.setFieldValue('channel', nextChannel);
-                }}
-                onBlur={formik.handleBlur}
-                aria-label='Channel'
-              >
-                <option value='EMAIL'>Email</option>
-                <option value='WHATSAPP'>WhatsApp</option>
-              </select>
+              <div className='channel-radio-group'>
+                <label
+                  className={`channel-radio-option${formik.values.channel === 'EMAIL' ? ' channel-radio-option--selected' : ''}${mode === 'edit' ? ' channel-radio-option--disabled' : ''}`}
+                >
+                  <input
+                    type='radio'
+                    name='channel'
+                    value='EMAIL'
+                    checked={formik.values.channel === 'EMAIL'}
+                    disabled={mode === 'edit'}
+                    onChange={() => {
+                      void formik.setFieldValue('channel', 'EMAIL');
+                    }}
+                    className='channel-radio-input'
+                  />
+                  <span className='channel-radio-label'>Email</span>
+                </label>
+                <label
+                  className={`channel-radio-option${formik.values.channel === 'WHATSAPP' ? ' channel-radio-option--selected' : ''}${mode === 'edit' ? ' channel-radio-option--disabled' : ''}`}
+                >
+                  <input
+                    type='radio'
+                    name='channel'
+                    value='WHATSAPP'
+                    checked={formik.values.channel === 'WHATSAPP'}
+                    disabled={mode === 'edit'}
+                    onChange={() => {
+                      void formik.setFieldValue('channel', 'WHATSAPP');
+                    }}
+                    className='channel-radio-input'
+                  />
+                  <span className='channel-radio-label'>WhatsApp</span>
+                </label>
+              </div>
               {formik.touched.channel && formik.errors.channel ? (
                 <div className='field-error'>{formik.errors.channel}</div>
               ) : null}
@@ -847,21 +938,162 @@ export default function TemplateFormScreen({
                 </div>
               </>
             ) : (
-              <TemplatePlainTextEditor
-                id='body'
-                label='WhatsApp Message'
-                value={formik.values.body}
-                maxLength={1024}
-                helperText='Compose a plain-text WhatsApp template with variables. CTA buttons are supported for document share links.'
-                onChange={(nextValue) => {
-                  void formik.setFieldValue('body', nextValue);
-                }}
-                onActivate={() => {
-                  setActiveVariableTarget('body');
-                }}
-                pendingVariableInsertion={pendingBodyVariableInsertion}
-                error={formik.touched.body ? formik.errors.body : undefined}
-              />
+              <>
+                <div className='whatsapp-fields-row'>
+                  <div className='field-group'>
+                    <label className='field-label' htmlFor='whatsappCategory'>
+                      WhatsApp Category
+                      <span>*</span>
+                    </label>
+                    <p className='helper-text'>Meta template category for approval routing.</p>
+                    <select
+                      id='whatsappCategory'
+                      name='whatsappCategory'
+                      className='select-input'
+                      value={formik.values.whatsappCategory}
+                      onChange={formik.handleChange}
+                      onBlur={formik.handleBlur}
+                      aria-label='WhatsApp Category'
+                    >
+                      <option value='MARKETING'>Marketing</option>
+                      <option value='UTILITY'>Utility</option>
+                    </select>
+                  </div>
+                  <div className='field-group'>
+                    <label className='field-label' htmlFor='whatsappLanguage'>
+                      Language
+                      <span>*</span>
+                    </label>
+                    <p className='helper-text'>Template language for Meta submission.</p>
+                    <select
+                      id='whatsappLanguage'
+                      name='whatsappLanguage'
+                      className='select-input'
+                      value={formik.values.whatsappLanguage}
+                      onChange={formik.handleChange}
+                      onBlur={formik.handleBlur}
+                      aria-label='Language'
+                    >
+                      {WHATSAPP_LANGUAGES.map((lang) => (
+                        <option key={lang.code} value={lang.code}>
+                          {lang.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className='field-group'>
+                  <label className='field-label' htmlFor='whatsappHeader'>
+                    Header
+                  </label>
+                  <p className='helper-text'>Optional header text, max 60 characters. Supports one variable.</p>
+                  <input
+                    id='whatsappHeader'
+                    name='whatsappHeader'
+                    className='text-input'
+                    maxLength={60}
+                    placeholder='e.g. Invoice {{document.number}}'
+                    value={formik.values.whatsappHeader}
+                    onChange={formik.handleChange}
+                    onBlur={formik.handleBlur}
+                    aria-label='WhatsApp Header'
+                  />
+                  {formik.values.whatsappHeader ? (
+                    <span className='field-char-count'>{formik.values.whatsappHeader.length} / 60</span>
+                  ) : null}
+                  {formik.touched.whatsappHeader && formik.errors.whatsappHeader ? (
+                    <div className='field-error'>{formik.errors.whatsappHeader}</div>
+                  ) : null}
+                </div>
+
+                <TemplatePlainTextEditor
+                  id='body'
+                  label='WhatsApp Message'
+                  value={formik.values.body}
+                  maxLength={1024}
+                  helperText='Compose a plain-text WhatsApp template with variables.'
+                  onChange={(nextValue) => {
+                    void formik.setFieldValue('body', nextValue);
+                  }}
+                  onActivate={() => {
+                    setActiveVariableTarget('body');
+                  }}
+                  pendingVariableInsertion={pendingBodyVariableInsertion}
+                  error={formik.touched.body ? formik.errors.body : undefined}
+                />
+
+                <div className='field-group'>
+                  <label className='field-label' htmlFor='whatsappFooter'>
+                    Footer
+                  </label>
+                  <p className='helper-text'>Optional footer text, max 60 characters. No variables allowed.</p>
+                  <input
+                    id='whatsappFooter'
+                    name='whatsappFooter'
+                    className='text-input'
+                    maxLength={60}
+                    placeholder='e.g. Sent via Refrens'
+                    value={formik.values.whatsappFooter}
+                    onChange={formik.handleChange}
+                    onBlur={formik.handleBlur}
+                    aria-label='WhatsApp Footer'
+                  />
+                  {formik.values.whatsappFooter ? (
+                    <span className='field-char-count'>{formik.values.whatsappFooter.length} / 60</span>
+                  ) : null}
+                  {formik.touched.whatsappFooter && formik.errors.whatsappFooter ? (
+                    <div className='field-error'>{formik.errors.whatsappFooter}</div>
+                  ) : null}
+                </div>
+
+                <fieldset className='whatsapp-button-fieldset'>
+                  <legend className='field-label'>Button (Optional)</legend>
+                  <p className='helper-text'>Add a tappable CTA button. Use the Add variable menu to insert a document share link.</p>
+                  <div className='whatsapp-button-fields'>
+                    <div className='field-group'>
+                      <label className='field-label field-label--small' htmlFor='whatsappButtonLabel'>
+                        Label
+                      </label>
+                      <input
+                        id='whatsappButtonLabel'
+                        name='whatsappButtonLabel'
+                        className='text-input'
+                        maxLength={20}
+                        placeholder='e.g. View Invoice'
+                        value={formik.values.whatsappButtonLabel}
+                        onChange={formik.handleChange}
+                        onBlur={formik.handleBlur}
+                        aria-label='Button Label'
+                      />
+                      {formik.values.whatsappButtonLabel ? (
+                        <span className='field-char-count'>{formik.values.whatsappButtonLabel.length} / 20</span>
+                      ) : null}
+                      {formik.touched.whatsappButtonLabel && formik.errors.whatsappButtonLabel ? (
+                        <div className='field-error'>{formik.errors.whatsappButtonLabel}</div>
+                      ) : null}
+                    </div>
+                    <div className='field-group'>
+                      <label className='field-label field-label--small' htmlFor='whatsappButtonUrl'>
+                        URL
+                      </label>
+                      <input
+                        id='whatsappButtonUrl'
+                        name='whatsappButtonUrl'
+                        className='text-input'
+                        placeholder='e.g. {{document.share_link}}'
+                        value={formik.values.whatsappButtonUrl}
+                        onChange={formik.handleChange}
+                        onBlur={formik.handleBlur}
+                        aria-label='Button URL'
+                      />
+                      {formik.touched.whatsappButtonUrl && formik.errors.whatsappButtonUrl ? (
+                        <div className='field-error'>{formik.errors.whatsappButtonUrl}</div>
+                      ) : null}
+                    </div>
+                  </div>
+                </fieldset>
+              </>
             )}
 
             {submitError ? <div className='template-inline-error'>{submitError}</div> : null}
@@ -874,6 +1106,10 @@ export default function TemplateFormScreen({
               templateType={formik.values.templateType}
               body={previewBody}
               variableOptions={variableCatalog.options}
+              header={formik.values.whatsappHeader}
+              footer={formik.values.whatsappFooter}
+              buttonLabel={formik.values.whatsappButtonLabel}
+              buttonUrl={formik.values.whatsappButtonUrl}
             />
           ) : (
             <TemplateEmailPreview
