@@ -852,7 +852,7 @@ export default function TemplateFormScreen({
                 label='WhatsApp Message'
                 value={formik.values.body}
                 maxLength={1024}
-                helperText='Compose a plain-text WhatsApp template with variables and direct links. Buttons and media stay out of scope in this step.'
+                helperText='Compose a plain-text WhatsApp template with variables. CTA buttons are supported for document share links.'
                 onChange={(nextValue) => {
                   void formik.setFieldValue('body', nextValue);
                 }}

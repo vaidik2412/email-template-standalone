@@ -16,10 +16,6 @@ export function getTemplateFieldValidationError(input: {
     return null;
   }
 
-  if (channel === 'WHATSAPP' && hasTemplateCtaTokens(value)) {
-    return 'CTA buttons are not supported in WhatsApp templates.';
-  }
-
   if (channel === 'WHATSAPP' && fieldKind === 'body' && value.length > WHATSAPP_TEMPLATE_BODY_MAX_LENGTH) {
     return `WhatsApp message can be at most ${WHATSAPP_TEMPLATE_BODY_MAX_LENGTH} characters.`;
   }

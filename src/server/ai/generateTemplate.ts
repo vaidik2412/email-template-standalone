@@ -120,7 +120,7 @@ When generating templates for accounting documents (invoices, quotations, purcha
 - ALWAYS include a CTA button for the document share link. Do NOT use {{document.share_link}} as plain text. Use this exact CTA token format:
   {{cta label="View Invoice" url="{{document.share_link}}" bg="#7d42df" text="#ffffff"}}
   Adjust the label to match the document type (e.g. "View Quotation", "View Purchase Order", "View Credit Note").
-  This CTA format works for BOTH email and WhatsApp channels.
+  This CTA format works for BOTH email and WhatsApp channels. For WhatsApp, the app will translate it to Meta's call_to_action button format before submission.
 - Address the customer by name using {{customer.name}}.
 - Mention your business name using {{business.name}}.
 

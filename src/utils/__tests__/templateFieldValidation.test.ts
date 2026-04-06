@@ -14,7 +14,7 @@ describe('getTemplateFieldValidationError', () => {
     ).toMatch(/1024/i);
   });
 
-  it('rejects CTA tokens in whatsapp body content', () => {
+  it('allows CTA tokens in whatsapp body content', () => {
     expect(
       getTemplateFieldValidationError({
         channel: 'WHATSAPP',
@@ -22,6 +22,6 @@ describe('getTemplateFieldValidationError', () => {
         value: '{{cta label="Pay now" url="https://pay.test"}}',
         allowedVariableKeys: [],
       }),
-    ).toMatch(/whatsapp/i);
+    ).toBeNull();
   });
 });
