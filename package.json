@@ -15,6 +15,7 @@
     "atlas:normalize": "node ./scripts/atlas-normalize-message-templates.mjs"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.82.0",
     "@loadable/component": "^5.15.0",
     "@toast-ui/editor": "3.1.10",
     "@toast-ui/editor-plugin-table-merged-cell": "^3.1.0",

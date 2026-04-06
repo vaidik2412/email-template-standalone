@@ -39,6 +39,7 @@ import type {
   TemplateVariableInsertionRequest,
   TemplateVariableTarget,
 } from './templateVariableInsertion';
+import AiTemplatePrompt from './AiTemplatePrompt';
 
 type TemplateFormScreenProps = {
   mode: 'create' | 'edit';
@@ -524,6 +525,31 @@ export default function TemplateFormScreen({
     await submitTemplate(buildTemplatePayload(formik.values), false);
   };
 
+  const handleAiGenerated = (result: {
+    name: string;
+    subject: string;
+    body: string;
+    signature?: string;
+    channel: 'EMAIL' | 'WHATSAPP';
+    templateType: (typeof ENABLED_EMAIL_TEMPLATE_TYPE_KEYS)[number];
+    documentSubtype?: DocumentTemplateSubtypeKey;
+  }) => {
+    void formik.setFieldValue('channel', result.channel);
+    void formik.setFieldValue('name', result.name);
+    void formik.setFieldValue('body', result.body);
+    void formik.setFieldValue('templateType', result.templateType);
+    void formik.setFieldValue('documentSubtype', result.documentSubtype || '');
+
+    if (result.channel === 'EMAIL') {
+      if (result.subject) {
+        void formik.setFieldValue('subject', result.subject);
+      }
+      if (result.signature) {
+        void formik.setFieldValue('signature', result.signature);
+      }
+    }
+  };
+
   const handlePublish = async () => {
     const errors = await formik.validateForm();
 
@@ -601,6 +627,10 @@ export default function TemplateFormScreen({
       <div className='template-content-grid template-content-grid--with-preview'>
         <section className='template-form-card'>
           <form id='template-form' className='template-form-stack' onSubmit={formik.handleSubmit}>
+            {mode === 'create' ? (
+              <AiTemplatePrompt onGenerated={handleAiGenerated} />
+            ) : null}
+
             <div className='field-group'>
               <label className='field-label' htmlFor='channel'>
                 Channel
