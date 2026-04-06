@@ -812,8 +812,7 @@ export default function TemplateFormScreen({
                     Email Signature
                   </label>
                   <p className='helper-text'>
-                    This is edited separately here and appended to the saved email body with a
-                    plain line break.
+                    Auto-appended below the email body as a sign-off.
                   </p>
                   <textarea
                     id='signature'
