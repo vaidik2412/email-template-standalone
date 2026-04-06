@@ -1,9 +1,20 @@
 import { generateTemplate, type GenerateTemplateInput } from '@/server/ai/generateTemplate';
 
-function jsonErrorResponse(error: unknown) {
-  const message = error instanceof Error ? error.message : 'Something went wrong';
+const KNOWN_ERROR_PREFIXES = [
+  'This doesn\'t look like',
+  'Could not generate',
+  'APP_ANTHROPIC_API_KEY is required',
+];
 
-  return Response.json({ message }, { status: 500 });
+function jsonErrorResponse(error: unknown) {
+  const raw = error instanceof Error ? error.message : '';
+  const isKnownError = KNOWN_ERROR_PREFIXES.some((prefix) => raw.startsWith(prefix));
+
+  const message = isKnownError
+    ? raw
+    : 'Something went wrong while generating the template. Please try again.';
+
+  return Response.json({ message }, { status: isKnownError ? 400 : 500 });
 }
 
 export async function POST(request: Request) {
