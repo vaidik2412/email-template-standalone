@@ -1,3 +1,4 @@
+import { traceable } from 'langsmith/traceable';
 import { getOpenAIApiKey, getOpenAIModel } from '../config';
 import { buildTemplateVariableCatalog } from '@/data/email/templateVariables';
 import { ENABLED_EMAIL_TEMPLATE_TYPE_KEYS, EMAIL_TEMPLATE_TYPES } from '@/data/email/templateTypes';
@@ -54,7 +55,7 @@ function buildAllVariableReferences() {
   return { crmVars, docVars };
 }
 
-export async function generateTemplate(input: GenerateTemplateInput): Promise<GenerateTemplateResult> {
+async function _generateTemplate(input: GenerateTemplateInput): Promise<GenerateTemplateResult> {
   const apiKey = getOpenAIApiKey();
   const model = getOpenAIModel();
 
@@ -291,3 +292,8 @@ When writing templates in a non-English language:
 
   return result;
 }
+
+export const generateTemplate = traceable(_generateTemplate, {
+  name: 'generateTemplate',
+  run_type: 'chain',
+});

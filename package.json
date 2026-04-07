@@ -12,7 +12,8 @@
     "atlas:bootstrap": "node ./scripts/atlas-bootstrap.mjs",
     "atlas:seed": "node ./scripts/atlas-bootstrap.mjs",
     "atlas:inspect": "node ./scripts/atlas-inspect.mjs",
-    "atlas:normalize": "node ./scripts/atlas-normalize-message-templates.mjs"
+    "atlas:normalize": "node ./scripts/atlas-normalize-message-templates.mjs",
+    "eval": "vitest run --config vitest.eval.config.mts"
   },
   "dependencies": {
     "@loadable/component": "^5.15.0",
@@ -31,6 +32,7 @@
     "fuse.js": "^6.4.6",
     "i18next": "^23.16.8",
     "is-image": "^3.0.0",
+    "langsmith": "^0.5.16",
     "lazysizes": "^5.3.2",
     "libphonenumber-js": "^1.11.3",
     "localforage": "^1.9.0",
