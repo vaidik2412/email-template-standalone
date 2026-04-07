@@ -13,7 +13,8 @@
     "atlas:seed": "node ./scripts/atlas-bootstrap.mjs",
     "atlas:inspect": "node ./scripts/atlas-inspect.mjs",
     "atlas:normalize": "node ./scripts/atlas-normalize-message-templates.mjs",
-    "eval": "vitest run --config vitest.eval.config.mts"
+    "eval": "vitest run --config vitest.eval.config.mts",
+    "eval:push": "npx tsx src/server/ai/__evals__/pushToLangsmith.ts"
   },
   "dependencies": {
     "@loadable/component": "^5.15.0",
