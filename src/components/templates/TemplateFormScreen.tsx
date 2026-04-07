@@ -939,50 +939,6 @@ export default function TemplateFormScreen({
               </>
             ) : (
               <>
-                <div className='whatsapp-fields-row'>
-                  <div className='field-group'>
-                    <label className='field-label' htmlFor='whatsappCategory'>
-                      WhatsApp Category
-                      <span>*</span>
-                    </label>
-                    <p className='helper-text'>Meta template category for approval routing.</p>
-                    <select
-                      id='whatsappCategory'
-                      name='whatsappCategory'
-                      className='select-input'
-                      value={formik.values.whatsappCategory}
-                      onChange={formik.handleChange}
-                      onBlur={formik.handleBlur}
-                      aria-label='WhatsApp Category'
-                    >
-                      <option value='MARKETING'>Marketing</option>
-                      <option value='UTILITY'>Utility</option>
-                    </select>
-                  </div>
-                  <div className='field-group'>
-                    <label className='field-label' htmlFor='whatsappLanguage'>
-                      Language
-                      <span>*</span>
-                    </label>
-                    <p className='helper-text'>Template language for Meta submission.</p>
-                    <select
-                      id='whatsappLanguage'
-                      name='whatsappLanguage'
-                      className='select-input'
-                      value={formik.values.whatsappLanguage}
-                      onChange={formik.handleChange}
-                      onBlur={formik.handleBlur}
-                      aria-label='Language'
-                    >
-                      {WHATSAPP_LANGUAGES.map((lang) => (
-                        <option key={lang.code} value={lang.code}>
-                          {lang.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
                 <div className='field-group'>
                   <label className='field-label' htmlFor='whatsappHeader'>
                     Header
@@ -1033,7 +989,7 @@ export default function TemplateFormScreen({
                     name='whatsappFooter'
                     className='text-input'
                     maxLength={60}
-                    placeholder='e.g. Sent via Refrens'
+                    placeholder='e.g. Thank you for your business'
                     value={formik.values.whatsappFooter}
                     onChange={formik.handleChange}
                     onBlur={formik.handleBlur}
@@ -1093,6 +1049,50 @@ export default function TemplateFormScreen({
                     </div>
                   </div>
                 </fieldset>
+
+                <div className='whatsapp-fields-row'>
+                  <div className='field-group'>
+                    <label className='field-label' htmlFor='whatsappCategory'>
+                      WhatsApp Category
+                      <span>*</span>
+                    </label>
+                    <p className='helper-text'>Meta template category for approval routing.</p>
+                    <select
+                      id='whatsappCategory'
+                      name='whatsappCategory'
+                      className='select-input'
+                      value={formik.values.whatsappCategory}
+                      onChange={formik.handleChange}
+                      onBlur={formik.handleBlur}
+                      aria-label='WhatsApp Category'
+                    >
+                      <option value='MARKETING'>Marketing</option>
+                      <option value='UTILITY'>Utility</option>
+                    </select>
+                  </div>
+                  <div className='field-group'>
+                    <label className='field-label' htmlFor='whatsappLanguage'>
+                      Language
+                      <span>*</span>
+                    </label>
+                    <p className='helper-text'>Template language for Meta submission.</p>
+                    <select
+                      id='whatsappLanguage'
+                      name='whatsappLanguage'
+                      className='select-input'
+                      value={formik.values.whatsappLanguage}
+                      onChange={formik.handleChange}
+                      onBlur={formik.handleBlur}
+                      aria-label='Language'
+                    >
+                      {WHATSAPP_LANGUAGES.map((lang) => (
+                        <option key={lang.code} value={lang.code}>
+                          {lang.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
               </>
             )}
 

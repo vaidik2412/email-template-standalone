@@ -32,6 +32,7 @@ export async function connectToDatabase() {
     mongooseCache.promise = mongoose.connect(mongodbUri, {
       bufferCommands: false,
       serverSelectionTimeoutMS: 10_000,
+      dbName: 'invoices',
     });
   }
 

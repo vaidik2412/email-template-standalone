@@ -1,5 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk';
-import { getAnthropicApiKey } from '../config';
+import { getOpenAIApiKey, getOpenAIModel } from '../config';
 import { buildTemplateVariableCatalog } from '@/data/email/templateVariables';
 import { ENABLED_EMAIL_TEMPLATE_TYPE_KEYS, EMAIL_TEMPLATE_TYPES } from '@/data/email/templateTypes';
 import type { EmailTemplateTypeKey } from '@/data/email/templateTypes';
@@ -56,8 +55,8 @@ function buildAllVariableReferences() {
 }
 
 export async function generateTemplate(input: GenerateTemplateInput): Promise<GenerateTemplateResult> {
-  const apiKey = getAnthropicApiKey();
-  const client = new Anthropic({ apiKey });
+  const apiKey = getOpenAIApiKey();
+  const model = getOpenAIModel();
 
   const { categories, subtypes } = buildCategoryReference();
   const { crmVars, docVars } = buildAllVariableReferences();
@@ -67,14 +66,18 @@ export async function generateTemplate(input: GenerateTemplateInput): Promise<Ge
 Your job is to generate professional message templates based on a user's description.
 
 ## Scope Guard — APPLY THIS FIRST
-This tool ONLY generates templates for business communication on the Refrens platform. Specifically:
-- Sales CRM outreach and follow-ups (leads, meetings, proposals, feedback, etc.)
-- Accounting document sharing (invoices, quotations, purchase orders, credit notes, etc.)
+This tool generates templates for business communication on the Refrens platform. There are two broad categories:
+- **Sales CRM**: outreach, follow-ups, introductions, meeting requests, proposals, feedback, lead nurturing, etc.
+- **Accounting Documents**: invoices, quotations, purchase orders, credit notes, payment reminders, overdue payment notices, payment receipts, delivery challans, proforma invoices, etc.
 
-If the user's request is NOT related to one of these two categories, do NOT generate a template. Instead, respond with ONLY this JSON:
+IMPORTANT: Be generous with scope. If the request is EVEN REMOTELY related to business sales or accounting/billing/payments, generate the template. Payment reminders, overdue notices, invoice sharing, quotation follow-ups — these are ALL in scope.
+
+Only reject requests that are CLEARLY unrelated to business communication. When in doubt, generate the template.
+
+If the user's request is clearly NOT related to either category, respond with ONLY this JSON:
 {"rejected": true, "reason": "A short explanation of why this is outside scope"}
 
-Examples of off-topic requests to REJECT:
+Examples of off-topic requests to REJECT (ONLY these kinds of requests):
 - Resignation letters, job applications, cover letters
 - Poems, stories, creative writing
 - Personal emails (birthday wishes, invitations)
@@ -107,7 +110,8 @@ ${docVars}
 ## Rules
 - Use ONLY variable tokens from the selected category. Do NOT invent new variables.
 - Variable tokens use the format {{variable.name}} — include the double curly braces.
-- Keep the tone professional but friendly.
+- Keep the tone **conversational and natural** — like a real person would talk or text. Avoid stiff, robotic, or overly formal phrasing. Sales CRM messages especially should feel like a human reaching out, not a corporate announcement.
+- For non-English templates, use natural spoken language — not textbook translations. For example in Hindi, prefer "क्या हम इस पर बात कर सकते हैं?" over "क्या आप इसे receive करना चाहेंगे?".
 - If channel is EMAIL: body uses markdown. CRITICAL formatting rules: (1) Use \\n\\n (double newline) between paragraphs — single \\n collapses into one line. (2) For field details, use a bullet list with bold labels. Put a blank line before the first bullet. Example in JSON: "Here are the details:\\n\\n- **Invoice Number:** {{document.number}}\\n- **Invoice Date:** {{document.date}}\\n- **Due Date:** {{document.due_date}}\\n\\nNext paragraph here." — this renders as a proper bulleted list with bold labels.
 - If channel is WHATSAPP: body must be plain text only (under 1024 chars), no markdown, no bold. Do NOT use {{cta ...}} tokens in the WhatsApp body — buttons are handled via the separate "whatsappButton" field.
 - Template name should be short and descriptive (3-6 words).
@@ -164,7 +168,7 @@ For WHATSAPP templates, use this shape:
 - "whatsappCategory": Use "UTILITY" for transactional messages (invoices, receipts, order updates). Use "MARKETING" for promotional/sales outreach.
 - "whatsappLanguage": Default to "en". ONLY use one of these supported codes: en, hi, es, fr, de, pt_BR, ar, id, it, ja, ko, zh_CN. If the user writes in a language not in this list, default to "en". For mixed-language templates (e.g. Hindi + English), use the dominant language code.
 - "whatsappHeader": Optional. Short bold header shown above the message. Max 60 characters. Supports at most one variable. Good for document templates, e.g. "Invoice {{document.number}}". Omit or set to empty string if not needed.
-- "whatsappFooter": Optional. Muted text below the message. Max 60 characters. No variables allowed. Use plain text like "Powered by Refrens" or omit.
+- "whatsappFooter": Optional. Muted text below the message. Max 60 characters. No variables allowed. Only include a footer if there's a genuinely useful message to show. Do NOT use branding text like "Powered by Refrens" or "Sent via Refrens". When in doubt, omit the footer entirely.
 - "whatsappButton": Optional. Set only when there's a meaningful action link (e.g. document share link). The "label" must be max 20 characters. Omit if not applicable (e.g. for a simple follow-up message).
 
 ## Non-English Language Rules
@@ -184,25 +188,46 @@ When writing templates in a non-English language:
 - Keep it concise — 2 to 4 lines.
 - Example: "Regards\\n{{my.name}}\\n{{my.business}}\\n{{my.phone}}"`;
 
-  const response = await client.messages.create({
-    model: 'claude-haiku-4-5-20251001',
-    max_tokens: 1024,
-    messages: [
-      {
-        role: 'user',
-        content: `Generate a message template for the following use case:\n\n${input.description}`,
-      },
-    ],
-    system: systemPrompt,
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      max_completion_tokens: 1024,
+      messages: [
+        {
+          role: 'system',
+          content: systemPrompt,
+        },
+        {
+          role: 'user',
+          content: `Generate a message template for the following use case:\n\n${input.description}`,
+        },
+      ],
+      temperature: 0.7,
+    }),
   });
 
-  const textBlock = response.content.find((block) => block.type === 'text');
+  if (!response.ok) {
+    const errorBody = await response.text().catch(() => '');
+    console.error('[generateTemplate] OpenAI API error:', response.status, errorBody);
+    throw new Error(`OpenAI API error (${response.status}): ${errorBody || response.statusText}`);
+  }
 
-  if (!textBlock || textBlock.type !== 'text') {
+  const data = await response.json();
+  const messageContent: string | undefined = data?.choices?.[0]?.message?.content;
+
+  if (!messageContent) {
+    console.error('[generateTemplate] No content in response:', JSON.stringify(data));
     throw new Error('No text response from AI model');
   }
 
-  const rawText = textBlock.text.trim().replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '');
+  console.log('[generateTemplate] Raw AI response:', messageContent.substring(0, 500));
+
+  const rawText = messageContent.trim().replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '');
 
   let parsed: GenerateTemplateResult & { documentSubtype?: string | null; rejected?: boolean; reason?: string };
 

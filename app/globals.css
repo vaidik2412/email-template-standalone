@@ -596,8 +596,9 @@ button {
 
 .whatsapp-button-fields {
   display: grid;
-  grid-template-columns: 140px 1fr;
+  grid-template-columns: 160px 1fr;
   gap: 12px;
+  align-items: start;
 }
 
 .field-label--small {
@@ -1048,7 +1049,7 @@ button {
 }
 
 .template-whatsapp-screen {
-  min-height: 812px;
+  height: 812px;
   display: flex;
   flex-direction: column;
   background: #efeff4;
@@ -1234,7 +1235,8 @@ button {
 .template-whatsapp-chat-body {
   flex: 1;
   position: relative;
-  background: #efeff4;
+  background: #e5ddd5;
+  background-image: url("data:image/svg+xml,%3Csvg width='80' height='80' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0h80v80H0z' fill='none'/%3E%3Ccircle cx='40' cy='40' r='1' fill='%23cec6b8' fill-opacity='0.4'/%3E%3C/svg%3E");
 }
 
 .template-whatsapp-chat-canvas {
@@ -1460,7 +1462,7 @@ button {
   }
 
   .template-whatsapp-screen {
-    min-height: 760px;
+    height: 812px;
   }
 }
 
@@ -1584,4 +1586,28 @@ button {
   padding: 0 12px;
   color: var(--brand-danger);
   font-size: 13px;
+}
+
+@media (max-width: 600px) {
+  .ai-prompt-bar-inner {
+    flex-wrap: wrap;
+  }
+
+  .ai-prompt-bar-input {
+    flex: 1 1 100%;
+    font-size: 14px;
+  }
+
+  .ai-prompt-bar-button {
+    width: 100%;
+    margin-top: 4px;
+  }
+
+  .whatsapp-fields-row {
+    grid-template-columns: 1fr;
+  }
+
+  .whatsapp-button-fields {
+    grid-template-columns: 1fr;
+  }
 }

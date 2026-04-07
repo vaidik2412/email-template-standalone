@@ -1,6 +1,6 @@
 export type ServerConfig = {
   mongodbUri: string;
-  anthropicApiKey?: string;
+  openaiApiKey?: string;
 };
 
 type EnvShape = Record<string, string | undefined>;
@@ -12,20 +12,24 @@ export function getServerConfig(env: EnvShape = process.env): ServerConfig {
     throw new Error('MONGODB_URI is required');
   }
 
-  const anthropicApiKey = env.ANTHROPIC_API_KEY?.trim() || undefined;
+  const openaiApiKey = env.APP_OPENAI_API_KEY?.trim() || env.OPENAI_API_KEY?.trim() || undefined;
 
   return {
     mongodbUri,
-    anthropicApiKey,
+    openaiApiKey,
   };
 }
 
-export function getAnthropicApiKey(env: EnvShape = process.env): string {
-  const apiKey = env.APP_ANTHROPIC_API_KEY?.trim() || env.ANTHROPIC_API_KEY?.trim();
+export function getOpenAIApiKey(env: EnvShape = process.env): string {
+  const apiKey = env.APP_OPENAI_API_KEY?.trim() || env.OPENAI_API_KEY?.trim();
 
   if (!apiKey) {
-    throw new Error('APP_ANTHROPIC_API_KEY is required — set it in .env.local to use AI template generation');
+    throw new Error('APP_OPENAI_API_KEY is required — set it in .env.local to use AI template generation');
   }
 
   return apiKey;
+}
+
+export function getOpenAIModel(env: EnvShape = process.env): string {
+  return env.APP_OPENAI_MODEL?.trim() || 'gpt-4o-mini';
 }

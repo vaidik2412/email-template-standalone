@@ -3,12 +3,14 @@ import { generateTemplate, type GenerateTemplateInput } from '@/server/ai/genera
 const KNOWN_ERROR_PREFIXES = [
   'This doesn\'t look like',
   'Could not generate',
-  'APP_ANTHROPIC_API_KEY is required',
+  'APP_OPENAI_API_KEY is required',
 ];
 
 function jsonErrorResponse(error: unknown) {
   const raw = error instanceof Error ? error.message : '';
   const isKnownError = KNOWN_ERROR_PREFIXES.some((prefix) => raw.startsWith(prefix));
+
+  console.error('[generate-template] Error:', raw);
 
   const message = isKnownError
     ? raw
