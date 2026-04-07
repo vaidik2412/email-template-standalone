@@ -1,4 +1,4 @@
-import { traceable } from 'langsmith/traceable';
+import { traceable, getCurrentRunTree } from 'langsmith/traceable';
 import { getOpenAIApiKey, getOpenAIModel } from '../config';
 import { buildTemplateVariableCatalog } from '@/data/email/templateVariables';
 import { ENABLED_EMAIL_TEMPLATE_TYPE_KEYS, EMAIL_TEMPLATE_TYPES } from '@/data/email/templateTypes';
@@ -220,6 +220,25 @@ When writing templates in a non-English language:
 
   const data = await response.json();
   const messageContent: string | undefined = data?.choices?.[0]?.message?.content;
+
+  // Attach token usage + model info to LangSmith trace
+  try {
+    const runTree = getCurrentRunTree();
+    runTree.metadata = {
+      ...(runTree.metadata ?? {}),
+      ls_provider: 'openai',
+      ls_model_name: model,
+    };
+    if (data?.usage) {
+      runTree.metadata.usage_metadata = {
+        input_tokens: data.usage.prompt_tokens ?? 0,
+        output_tokens: data.usage.completion_tokens ?? 0,
+        total_tokens: (data.usage.prompt_tokens ?? 0) + (data.usage.completion_tokens ?? 0),
+      };
+    }
+  } catch {
+    // Not in a traced context — ignore
+  }
 
   if (!messageContent) {
     console.error('[generateTemplate] No content in response:', JSON.stringify(data));
