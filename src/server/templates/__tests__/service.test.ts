@@ -1,8 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Types } from 'mongoose';
 
-const { connectToDatabase, getMessageTemplateModel, validateTemplateVariableUsage } = vi.hoisted(
+const {
+  buildWhatsappTemplateSubmissionPayload,
+  connectToDatabase,
+  getMessageTemplateModel,
+  validateTemplateVariableUsage,
+} = vi.hoisted(
   () => ({
+    buildWhatsappTemplateSubmissionPayload: vi.fn(),
     connectToDatabase: vi.fn(),
     getMessageTemplateModel: vi.fn(),
     validateTemplateVariableUsage: vi.fn(),
@@ -19,6 +25,10 @@ vi.mock('../../models/messageTemplate', () => ({
 
 vi.mock('../../templateVariables/service', () => ({
   validateTemplateVariableUsage,
+}));
+
+vi.mock('../../whatsapp/submission', () => ({
+  buildWhatsappTemplateSubmissionPayload,
 }));
 
 import { createTemplate, listTemplates, updateTemplate } from '../service';
@@ -51,6 +61,7 @@ describe('template service', () => {
     vi.clearAllMocks();
     connectToDatabase.mockResolvedValue(undefined);
     validateTemplateVariableUsage.mockResolvedValue(undefined);
+    buildWhatsappTemplateSubmissionPayload.mockReturnValue({});
   });
 
   it('creates whatsapp templates with the requested channel', async () => {
@@ -78,6 +89,75 @@ describe('template service', () => {
       }),
     );
     expect(result.channel).toBe('WHATSAPP');
+  });
+
+  it('does not require submission-safe whatsapp fields when saving a draft', async () => {
+    const create = vi.fn().mockResolvedValue({
+      toObject: () =>
+        buildStoredTemplate({
+          channel: 'WHATSAPP',
+        }),
+    });
+
+    getMessageTemplateModel.mockReturnValue({
+      create,
+    });
+
+    await createTemplate(
+      {
+        channel: 'WHATSAPP',
+        name: 'Draft Reminder',
+        body: 'Hello {{contact.name}}',
+        templateType: 'SALES_CRM',
+      },
+      {
+        isPublished: false,
+      },
+    );
+
+    expect(buildWhatsappTemplateSubmissionPayload).not.toHaveBeenCalled();
+    expect(create).toHaveBeenCalledOnce();
+  });
+
+  it('validates whatsapp templates against the submission contract before publishing', async () => {
+    const create = vi.fn().mockResolvedValue({
+      toObject: () =>
+        buildStoredTemplate({
+          channel: 'WHATSAPP',
+        }),
+    });
+
+    getMessageTemplateModel.mockReturnValue({
+      create,
+    });
+
+    await createTemplate(
+      {
+        channel: 'WHATSAPP',
+        name: 'invoice_share',
+        body: 'Hello {{contact.name}}',
+        templateType: 'SALES_CRM',
+        whatsapp: {
+          category: 'MARKETING',
+          language: 'en',
+        },
+      },
+      {
+        isPublished: true,
+      },
+    );
+
+    expect(buildWhatsappTemplateSubmissionPayload).toHaveBeenCalledWith({
+      name: 'invoice_share',
+      body: 'Hello {{contact.name}}',
+      templateType: 'SALES_CRM',
+      documentSubtype: undefined,
+      whatsapp: {
+        category: 'MARKETING',
+        language: 'en',
+      },
+    });
+    expect(create).toHaveBeenCalledOnce();
   });
 
   it('preserves the original channel when updating an existing template', async () => {
@@ -116,6 +196,62 @@ describe('template service', () => {
       expect.any(Object),
     );
     expect(result.channel).toBe('WHATSAPP');
+  });
+
+  it('validates preserved whatsapp channel updates before publishing', async () => {
+    const existingTemplate = buildStoredTemplate({
+      channel: 'WHATSAPP',
+      name: 'existing_whatsapp',
+      body: 'Old body',
+      templateType: 'SALES_CRM',
+      whatsapp: {
+        category: 'MARKETING',
+        language: 'en',
+      },
+    });
+    const findOne = vi.fn().mockReturnValue({
+      lean: vi.fn().mockResolvedValue(existingTemplate),
+    });
+    const findOneAndUpdate = vi.fn().mockReturnValue({
+      lean: vi.fn().mockResolvedValue(
+        buildStoredTemplate({
+          channel: 'WHATSAPP',
+          body: 'Updated body',
+        }),
+      ),
+    });
+
+    getMessageTemplateModel.mockReturnValue({
+      findOne,
+      findOneAndUpdate,
+    });
+
+    await updateTemplate(
+      existingTemplate._id.toString(),
+      {
+        name: 'updated_whatsapp',
+        body: 'Updated body',
+        whatsapp: {
+          category: 'MARKETING',
+          language: 'en',
+        },
+      },
+      {
+        isPublished: true,
+      },
+    );
+
+    expect(buildWhatsappTemplateSubmissionPayload).toHaveBeenCalledWith({
+      name: 'updated_whatsapp',
+      body: 'Updated body',
+      templateType: 'SALES_CRM',
+      documentSubtype: undefined,
+      whatsapp: {
+        category: 'MARKETING',
+        language: 'en',
+      },
+    });
+    expect(findOneAndUpdate).toHaveBeenCalledOnce();
   });
 
   it('still seeds default email templates when whatsapp templates already exist', async () => {

@@ -13,9 +13,13 @@ import { connectToDatabase } from '../db';
 import { FIXED_APP_CONTEXT } from '../constants/fixedContext';
 import { getMessageTemplateModel } from '../models/messageTemplate';
 import { applyTemplateMutation } from './mutations';
-import { TemplateNotFoundError } from './errors';
+import { TemplateNotFoundError, TemplatePayloadValidationError } from './errors';
 import { getTemplateScopeQuery, getVisibleTemplateQuery } from './queries';
 import { validateTemplateVariableUsage } from '../templateVariables/service';
+import {
+  buildWhatsappTemplateSubmissionPayload,
+  WhatsappTemplateSubmissionValidationError,
+} from '../whatsapp/submission';
 
 const DEFAULT_LIMIT = 10;
 
@@ -213,6 +217,36 @@ async function ensureDefaultWhatsappTemplates() {
   await MessageTemplate.insertMany(payload);
 }
 
+function validateWhatsappPublishPayload(input: {
+  channel: SerializedMessageTemplate['channel'];
+  isPublished?: boolean;
+  name?: string;
+  body?: string;
+  templateType?: SerializedMessageTemplate['templateType'];
+  documentSubtype?: DocumentTemplateSubtypeKey;
+  whatsapp?: TemplateWritePayload['whatsapp'];
+}) {
+  if (!input.isPublished || input.channel !== 'WHATSAPP') {
+    return;
+  }
+
+  try {
+    buildWhatsappTemplateSubmissionPayload({
+      name: input.name,
+      body: input.body,
+      templateType: input.templateType,
+      documentSubtype: input.documentSubtype,
+      whatsapp: input.whatsapp,
+    });
+  } catch (error) {
+    if (error instanceof WhatsappTemplateSubmissionValidationError) {
+      throw new TemplatePayloadValidationError(error.errors.join(' '));
+    }
+
+    throw error;
+  }
+}
+
 export async function listTemplates(): Promise<TemplateListResponse> {
   await connectToDatabase();
   await ensureDefaultTemplates();
@@ -278,6 +312,16 @@ export async function createTemplate(
     documentSubtype: normalizedPayload.documentSubtype,
     subject: channel === 'EMAIL' ? normalizedPayload.subject : undefined,
     body: normalizedPayload.body,
+  });
+
+  validateWhatsappPublishPayload({
+    channel,
+    isPublished: options.isPublished,
+    name: normalizedPayload.name,
+    body: normalizedPayload.body,
+    templateType: normalizedPayload.templateType as SerializedMessageTemplate['templateType'],
+    documentSubtype: normalizedPayload.documentSubtype,
+    whatsapp: normalizedPayload.whatsapp,
   });
 
   const document = await MessageTemplate.create(
@@ -350,6 +394,16 @@ export async function updateTemplate(
     documentSubtype: normalizedPayload.documentSubtype,
     subject: preservedChannel === 'EMAIL' ? normalizedPayload.subject : undefined,
     body: normalizedPayload.body,
+  });
+
+  validateWhatsappPublishPayload({
+    channel: preservedChannel,
+    isPublished: options.isPublished,
+    name: normalizedPayload.name,
+    body: normalizedPayload.body,
+    templateType: normalizedPayload.templateType as SerializedMessageTemplate['templateType'],
+    documentSubtype: normalizedPayload.documentSubtype,
+    whatsapp: normalizedPayload.whatsapp,
   });
 
   const template = await MessageTemplate.findOneAndUpdate(
