@@ -142,7 +142,7 @@ describe('TemplateFormScreen in edit mode', () => {
     render(<TemplateFormScreen mode='edit' templateId='template-whatsapp' />);
 
     await waitFor(() => {
-      expect(screen.getByDisplayValue('WhatsApp reminder')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('whatsapp_reminder')).toBeInTheDocument();
     });
 
     const whatsappRadio = screen.getByRole('radio', { name: /whatsapp/i });
@@ -172,6 +172,7 @@ describe('TemplateFormScreen in edit mode', () => {
 
     expect(payload).toMatchObject({
       channel: 'WHATSAPP',
+      name: 'whatsapp_reminder',
       body: 'Updated {{contact.name}}',
     });
     expect(payload).not.toHaveProperty('subject');

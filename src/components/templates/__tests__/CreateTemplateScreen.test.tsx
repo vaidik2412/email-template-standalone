@@ -365,6 +365,10 @@ describe('TemplateFormScreen in create mode', () => {
     fireEvent.change(screen.getByLabelText(/template name/i), {
       target: { value: 'WhatsApp reminder' },
     });
+    expect(screen.getByLabelText(/template name/i)).toHaveValue('whatsapp_reminder');
+    expect(
+      screen.getByText(/whatsapp submission names use lowercase letters, numbers, and underscores/i),
+    ).toBeInTheDocument();
     fireEvent.change(messageField, {
       target: { value: 'Hello {{contact.name}}' },
     });
@@ -384,7 +388,7 @@ describe('TemplateFormScreen in create mode', () => {
 
     expect(payload).toMatchObject({
       channel: 'WHATSAPP',
-      name: 'WhatsApp reminder',
+      name: 'whatsapp_reminder',
       body: 'Hello {{contact.name}}',
       templateType: 'SALES_CRM',
       whatsapp: {
@@ -393,6 +397,17 @@ describe('TemplateFormScreen in create mode', () => {
       },
     });
     expect(payload).not.toHaveProperty('subject');
+  });
+
+  it('allows typing a trailing underscore in whatsapp template names', async () => {
+    render(<TemplateFormScreen mode='create' />);
+
+    fireEvent.click(screen.getByRole('radio', { name: /whatsapp/i }));
+    fireEvent.change(screen.getByLabelText(/template name/i), {
+      target: { value: 'invoice_' },
+    });
+
+    expect(screen.getByLabelText(/template name/i)).toHaveValue('invoice_');
   });
 
   it('inserts document share links into whatsapp button fields', async () => {

@@ -20,6 +20,11 @@ import type { TemplateVariableOption } from '@/types/templateVariable';
 import { removeMarkdownEditorsInternalVariables } from '@/utils/removeMarkdownEditorsInternalVariables';
 import { buildTemplateCtaToken } from '@/utils/templateCtas';
 import { getTemplateFieldValidationError } from '@/utils/templateFieldValidation';
+import {
+  isWhatsappTemplateNameSafe,
+  normalizeWhatsappTemplateNameInput,
+  normalizeWhatsappTemplateName,
+} from '@/utils/whatsappTemplateName';
 import { getTemplateVariableToken } from './templatePreviewUtils';
 
 import { templateFormSchema } from './templateFormSchema';
@@ -103,7 +108,10 @@ function getDuplicateValues(template: SerializedMessageTemplate): TemplateFormVa
 
   return {
     channel: source.channel,
-    name: `[DUPLICATE] ${source.name}`,
+    name:
+      source.channel === 'WHATSAPP'
+        ? normalizeWhatsappTemplateName(`duplicate_${source.name}`)
+        : `[DUPLICATE] ${source.name}`,
     subject: source.subject || '',
     body: bodySections.body,
     signature: bodySections.signature,
@@ -130,7 +138,10 @@ function getEditValues(template: SerializedMessageTemplate): TemplateFormValues 
 
   return {
     channel: template.channel,
-    name: template.name,
+    name:
+      template.channel === 'WHATSAPP'
+        ? normalizeWhatsappTemplateName(template.name)
+        : template.name,
     subject: template.subject || '',
     body: bodySections.body,
     signature: bodySections.signature,
@@ -316,6 +327,10 @@ export default function TemplateFormScreen({
         }
       }
 
+      if (values.channel === 'WHATSAPP' && !isWhatsappTemplateNameSafe(values.name)) {
+        errors.name = 'Use only lowercase letters, numbers, and underscores.';
+      }
+
       const bodyError = getTemplateFieldValidationError({
         channel: values.channel,
         fieldKind: 'body',
@@ -425,6 +440,18 @@ export default function TemplateFormScreen({
   useEffect(() => {
     setActiveVariableTarget(formik.values.channel === 'WHATSAPP' ? 'body' : 'subject');
   }, [formik.values.channel]);
+
+  useEffect(() => {
+    if (formik.values.channel !== 'WHATSAPP') {
+      return;
+    }
+
+    const normalizedName = normalizeWhatsappTemplateNameInput(formik.values.name);
+
+    if (normalizedName !== formik.values.name) {
+      void formik.setFieldValue('name', normalizedName);
+    }
+  }, [formik.values.channel, formik.values.name]);
 
   useEffect(() => {
     if (!pendingSubjectSelectionRef.current || !subjectInputRef.current) {
@@ -600,7 +627,12 @@ export default function TemplateFormScreen({
     whatsappButton?: { label: string; url: string };
   }) => {
     void formik.setFieldValue('channel', result.channel);
-    void formik.setFieldValue('name', result.name);
+    void formik.setFieldValue(
+      'name',
+      result.channel === 'WHATSAPP'
+        ? normalizeWhatsappTemplateName(result.name)
+        : result.name,
+    );
     void formik.setFieldValue('body', result.body);
     void formik.setFieldValue('templateType', result.templateType);
     void formik.setFieldValue('documentSubtype', result.documentSubtype || '');
@@ -824,10 +856,22 @@ export default function TemplateFormScreen({
                 name='name'
                 className='text-input'
                 value={formik.values.name}
-                onChange={formik.handleChange}
+                onChange={(event) => {
+                  const nextName =
+                    formik.values.channel === 'WHATSAPP'
+                      ? normalizeWhatsappTemplateNameInput(event.target.value)
+                      : event.target.value;
+
+                  void formik.setFieldValue('name', nextName);
+                }}
                 onBlur={formik.handleBlur}
                 aria-label='Template Name'
               />
+              {formik.values.channel === 'WHATSAPP' ? (
+                <p className='helper-text'>
+                  WhatsApp submission names use lowercase letters, numbers, and underscores.
+                </p>
+              ) : null}
               {formik.touched.name && formik.errors.name ? (
                 <div className='field-error'>{formik.errors.name}</div>
               ) : null}
