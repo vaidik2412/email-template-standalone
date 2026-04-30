@@ -8,7 +8,10 @@ import {
   extractTemplateVariableKeys,
   findUnsupportedTemplateVariables,
 } from '@/utils/templateVariables';
-import { isWhatsappTemplateNameSafe } from '@/utils/whatsappTemplateName';
+import {
+  isWhatsappTemplateNameSafe,
+  normalizeWhatsappTemplateName,
+} from '@/utils/whatsappTemplateName';
 import { buildWhatsappSubmissionPayload } from '@/utils/whatsappTemplateTranslation';
 
 type WhatsappSubmissionTemplateInput = {
@@ -114,6 +117,7 @@ function validateSupportedVariables(input: {
 export function validateWhatsappTemplateForSubmission(input: WhatsappSubmissionTemplateInput) {
   const errors: string[] = [];
   const name = input.name?.trim() || '';
+  const submissionName = normalizeWhatsappTemplateName(name);
   const body = input.body?.trim() || '';
   const category = input.whatsapp?.category;
   const language = input.whatsapp?.language?.trim() || '';
@@ -124,7 +128,7 @@ export function validateWhatsappTemplateForSubmission(input: WhatsappSubmissionT
 
   if (!name) {
     errors.push('Template name is required.');
-  } else if (!isWhatsappTemplateNameSafe(name)) {
+  } else if (!submissionName || !isWhatsappTemplateNameSafe(submissionName)) {
     errors.push('Template name must use only lowercase letters, numbers, and underscores.');
   }
 
@@ -251,7 +255,7 @@ export function buildWhatsappTemplateSubmissionPayload(
   }
 
   return {
-    name: input.name?.trim() || '',
+    name: normalizeWhatsappTemplateName(input.name || ''),
     category: input.whatsapp?.category as 'MARKETING' | 'UTILITY',
     language: input.whatsapp?.language?.trim() || '',
     components,
