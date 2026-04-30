@@ -28,8 +28,12 @@ describe('validateWhatsappTemplateForSubmission', () => {
     expect(validateWhatsappTemplateForSubmission(validTemplate)).toEqual([]);
   });
 
-  it('rejects names that WhatsApp providers cannot submit', () => {
-    expect(validateWhatsappTemplateForSubmission({ ...validTemplate, name: 'Invoice Share' })).toContain(
+  it('accepts readable names because submission uses a WhatsApp-safe slug', () => {
+    expect(validateWhatsappTemplateForSubmission({ ...validTemplate, name: 'Invoice Share' })).toEqual([]);
+  });
+
+  it('rejects names that cannot produce a WhatsApp-safe slug', () => {
+    expect(validateWhatsappTemplateForSubmission({ ...validTemplate, name: '!!!' })).toContain(
       'Template name must use only lowercase letters, numbers, and underscores.',
     );
   });
@@ -121,10 +125,25 @@ describe('buildWhatsappTemplateSubmissionPayload', () => {
     });
   });
 
+  it('normalizes readable names before building the submission payload', () => {
+    expect(
+      buildWhatsappTemplateSubmissionPayload({
+        name: 'Invoice Share',
+        body: 'Hello {{customer.name}}',
+        templateType: 'ACCOUNTING_DOCUMENTS',
+        documentSubtype: 'INVOICE',
+        whatsapp: {
+          category: 'UTILITY',
+          language: 'en',
+        },
+      }).name,
+    ).toBe('invoice_share');
+  });
+
   it('throws a validation error instead of building an un-submittable payload', () => {
     expect(() =>
       buildWhatsappTemplateSubmissionPayload({
-        name: 'Invoice Share',
+        name: '!!!',
         body: 'Hello {{customer.name}}',
         templateType: 'ACCOUNTING_DOCUMENTS',
         documentSubtype: 'INVOICE',

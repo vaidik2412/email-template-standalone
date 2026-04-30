@@ -681,6 +681,19 @@ button {
   gap: 16px;
 }
 
+.template-form-fieldset {
+  display: grid;
+  gap: 16px;
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.template-form-fieldset--locked {
+  opacity: 0.55;
+}
+
 .template-form-variable-actions {
   position: relative;
   z-index: 40;

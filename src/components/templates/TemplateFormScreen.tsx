@@ -818,7 +818,7 @@ export default function TemplateFormScreen({
           <form id='template-form' className='template-form-stack' onSubmit={formik.handleSubmit}>
             <fieldset
               disabled={isFormLocked}
-              style={{ border: 0, padding: 0, margin: 0, opacity: isFormLocked ? 0.55 : 1 }}
+              className={`template-form-fieldset${isFormLocked ? ' template-form-fieldset--locked' : ''}`}
             >
             {mode === 'create' ? (
               <AiTemplatePrompt onGenerated={handleAiGenerated} />
