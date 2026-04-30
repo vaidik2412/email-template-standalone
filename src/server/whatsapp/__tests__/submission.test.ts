@@ -87,8 +87,6 @@ describe('buildWhatsappTemplateSubmissionPayload', () => {
       name: 'invoice_share_followup',
       category: 'UTILITY',
       language: 'en',
-      templateType: 'ACCOUNTING_DOCUMENTS',
-      documentSubtype: 'INVOICE',
       components: [
         {
           type: 'HEADER',

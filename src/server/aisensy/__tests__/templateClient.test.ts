@@ -36,8 +36,6 @@ describe('AiSensy template client', () => {
         name: 'invoice_reminder',
         category: 'UTILITY',
         language: 'en',
-        templateType: 'ACCOUNTING_DOCUMENTS',
-        documentSubtype: 'INVOICE',
         components: [
           {
             type: 'BODY',
@@ -64,8 +62,6 @@ describe('AiSensy template client', () => {
       name: 'invoice_reminder',
       category: 'UTILITY',
       language: 'en',
-      templateType: 'ACCOUNTING_DOCUMENTS',
-      documentSubtype: 'INVOICE',
       components: [
         {
           type: 'BODY',
@@ -198,7 +194,6 @@ describe('AiSensy template client', () => {
           name: 'bad_template',
           category: 'MARKETING',
           language: 'en',
-          templateType: 'SALES_CRM',
           components: [],
         },
         createConfig,
@@ -217,7 +212,6 @@ describe('AiSensy template client', () => {
           name: 'invoice_reminder',
           category: 'UTILITY',
           language: 'en',
-          templateType: 'SALES_CRM',
           components: [],
         },
         {

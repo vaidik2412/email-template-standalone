@@ -49,8 +49,6 @@ export type WhatsappTemplateSubmissionPayload = {
   name: string;
   category: 'MARKETING' | 'UTILITY';
   language: string;
-  templateType: EmailTemplateTypeKey;
-  documentSubtype?: DocumentTemplateSubtypeKey;
   components: WhatsappSubmissionComponent[];
 };
 
@@ -253,8 +251,6 @@ export function buildWhatsappTemplateSubmissionPayload(
     name: input.name?.trim() || '',
     category: input.whatsapp?.category as 'MARKETING' | 'UTILITY',
     language: input.whatsapp?.language?.trim() || '',
-    templateType: input.templateType || 'SALES_CRM',
-    documentSubtype: input.documentSubtype,
     components,
   };
 }

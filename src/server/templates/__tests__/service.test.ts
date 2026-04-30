@@ -80,7 +80,6 @@ describe('template service', () => {
       name: 'invoice_share',
       category: 'MARKETING',
       language: 'en',
-      templateType: 'SALES_CRM',
       components: [],
     });
     getAiSensyTemplateApiConfig.mockReturnValue({
