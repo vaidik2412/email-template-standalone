@@ -109,7 +109,7 @@ export function buildAisensyCreatePayload(
     //       store `{{document.share_link}}` directly) AND the example value is
     //       a full URL → decompose: take everything up to the last path
     //       segment as the static prefix, register
-    //       `<prefix>/{{N}}` where N continues body's numbering.
+    //       `<prefix>/{{1}}` for the button's own dynamic URL suffix.
     //   (c) Same as (b) but no example value to decompose → fall back to the
     //       bare URL string we have. Meta will reject; the form error shows
     //       a clear message to the user.
@@ -128,7 +128,7 @@ export function buildAisensyCreatePayload(
       const lastSlash = exampleValue.lastIndexOf('/');
       if (lastSlash > 'https://'.length) {
         const prefix = exampleValue.slice(0, lastSlash + 1);
-        ctaUrl = `${prefix}{{${bodyExamples.length + 1}}}`;
+        ctaUrl = `${prefix}{{1}}`;
       } else {
         ctaUrl = exampleValue;
       }
