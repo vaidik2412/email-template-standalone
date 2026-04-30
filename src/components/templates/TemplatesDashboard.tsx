@@ -1,12 +1,20 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 
 import { EMAIL_TEMPLATE_TYPES } from '@/data/email/templateTypes';
 import type { SerializedMessageTemplate } from '@/types/messageTemplate';
 
 import { useTemplates } from './hooks/useTemplates';
+import { useRefreshTemplateStatus } from './hooks/useRefreshTemplateStatus';
+
+function renderWaStatusBadge(template: SerializedMessageTemplate) {
+  if (template.channel !== 'WHATSAPP') return null;
+  const raw = (template.whatsapp?.status || 'PENDING').toUpperCase();
+  const cls = `template-wa-status template-wa-status--${raw.toLowerCase()}`;
+  return <span className={cls}>{raw}</span>;
+}
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat('en-IN', {
@@ -31,7 +39,37 @@ function renderChannelLabel(channel: SerializedMessageTemplate['channel']) {
 }
 
 export default function TemplatesDashboard() {
-  const { templates, isLoading, error, activeTemplateId, patchTemplate } = useTemplates();
+  const { templates, isLoading, error, activeTemplateId, patchTemplate, fetchTemplates } =
+    useTemplates();
+  const { refresh: refreshStatus, isRefreshing: refreshingTemplateId } =
+    useRefreshTemplateStatus();
+  const [statusToast, setStatusToast] = useState<{
+    name: string;
+    status: string;
+    changed: boolean;
+    at: number;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!statusToast) return;
+    const timer = window.setTimeout(() => setStatusToast(null), 4500);
+    return () => window.clearTimeout(timer);
+  }, [statusToast]);
+
+  const handleRefreshStatus = async (template: SerializedMessageTemplate) => {
+    const previousStatus = (template.whatsapp?.status || 'PENDING').toUpperCase();
+    const next = await refreshStatus(template._id);
+    if (next) {
+      const newStatus = (next.whatsapp?.status || 'PENDING').toUpperCase();
+      setStatusToast({
+        name: next.name,
+        status: newStatus,
+        changed: newStatus !== previousStatus,
+        at: Date.now(),
+      });
+      void fetchTemplates();
+    }
+  };
 
   const totalTemplatesLabel = useMemo(() => {
     if (!templates.length) {
@@ -43,6 +81,18 @@ export default function TemplatesDashboard() {
 
   return (
     <main className='dashboard-shell'>
+      {statusToast ? (
+        <div
+          key={statusToast.at}
+          className={`template-status-toast template-status-toast--${statusToast.status.toLowerCase()}`}
+          role='status'
+          aria-live='polite'
+        >
+          {statusToast.changed
+            ? `${statusToast.name}: status updated to ${statusToast.status}.`
+            : `${statusToast.name}: still ${statusToast.status}.`}
+        </div>
+      ) : null}
       <section className='dashboard-hero'>
         <div>
           <p className='eyebrow'>Settings / Templates</p>
@@ -84,6 +134,7 @@ export default function TemplatesDashboard() {
                   <th>Channel</th>
                   <th>Category</th>
                   <th>Status</th>
+                  <th>WA Approval</th>
                   <th>Created By</th>
                   <th>Unpublished Changes</th>
                   <th>Subject</th>
@@ -104,6 +155,30 @@ export default function TemplatesDashboard() {
                     </td>
                     <td>{EMAIL_TEMPLATE_TYPES[template.templateType]?.label || template.templateType}</td>
                     <td>{renderStatus(template)}</td>
+                    <td>
+                      {template.channel === 'WHATSAPP' ? (
+                        <div className='template-wa-status-cell'>
+                          {renderWaStatusBadge(template)}
+                          {template.status === 'LIVE' &&
+                          (template.whatsapp?.status || '').toUpperCase() !== 'APPROVED' ? (
+                            <button
+                              type='button'
+                              className='template-wa-refresh'
+                              aria-label='Refresh WhatsApp approval status'
+                              title='Refresh WhatsApp approval status'
+                              disabled={refreshingTemplateId === template._id}
+                              onClick={() => {
+                                void handleRefreshStatus(template);
+                              }}
+                            >
+                              {refreshingTemplateId === template._id ? '⟳' : '↻'}
+                            </button>
+                          ) : null}
+                        </div>
+                      ) : (
+                        <span className='template-wa-status-cell-empty'>—</span>
+                      )}
+                    </td>
                     <td>{template.createdBy?.name || 'Default'}</td>
                     <td>{template.isModifiedPostPublish ? 'Yes' : 'No'}</td>
                     <td>{template.channel === 'WHATSAPP' ? 'Not used for WhatsApp' : template.subject}</td>

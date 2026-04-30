@@ -14,3 +14,13 @@ export class TemplatePayloadValidationError extends Error {
     this.status = 400;
   }
 }
+
+export class TemplateLockedError extends Error {
+  status: number;
+
+  constructor(message: string) {
+    super(message);
+    this.name = 'TemplateLockedError';
+    this.status = 409;
+  }
+}

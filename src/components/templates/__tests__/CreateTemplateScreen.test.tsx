@@ -359,7 +359,7 @@ describe('TemplateFormScreen in create mode', () => {
     expect(screen.queryByLabelText(/email subject/i)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/email signature/i)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /insert button/i })).not.toBeInTheDocument();
-    expect(screen.getByText(/whatsapp preview/i)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /whatsapp preview/i })).toBeInTheDocument();
     expect(screen.getByText(/0\s*\/\s*1024/i)).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText(/template name/i), {
@@ -369,6 +369,9 @@ describe('TemplateFormScreen in create mode', () => {
       target: { value: 'Hello {{contact.name}}' },
     });
     fireEvent.click(screen.getByRole('button', { name: /publish template/i }));
+
+    // WhatsApp publishes go through a confirmation modal first.
+    fireEvent.click(await screen.findByRole('button', { name: /submit for approval/i }));
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(

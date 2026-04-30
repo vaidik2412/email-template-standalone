@@ -151,12 +151,15 @@ describe('TemplateFormScreen in edit mode', () => {
     expect(screen.queryByLabelText(/email subject/i)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/email signature/i)).not.toBeInTheDocument();
     expect(screen.getByLabelText(/whatsapp message/i)).toHaveValue('Hello {{contact.name}}');
-    expect(screen.getByText(/whatsapp preview/i)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /whatsapp preview/i })).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText(/whatsapp message/i), {
       target: { value: 'Updated {{contact.name}}' },
     });
     fireEvent.click(screen.getByRole('button', { name: /publish template/i }));
+
+    // WhatsApp publishes go through a confirmation modal first.
+    fireEvent.click(await screen.findByRole('button', { name: /submit for approval/i }));
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
