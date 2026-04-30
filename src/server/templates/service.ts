@@ -13,9 +13,13 @@ import { connectToDatabase } from '../db';
 import { FIXED_APP_CONTEXT } from '../constants/fixedContext';
 import { getMessageTemplateModel } from '../models/messageTemplate';
 import { applyTemplateMutation } from './mutations';
-import { TemplateNotFoundError } from './errors';
+import { TemplateLockedError, TemplateNotFoundError } from './errors';
 import { getTemplateScopeQuery, getVisibleTemplateQuery } from './queries';
 import { validateTemplateVariableUsage } from '../templateVariables/service';
+import {
+  fetchTemplateStatusFromAisensy,
+  submitTemplateToAisensy,
+} from '../aisensy/publishTemplate';
 
 const DEFAULT_LIMIT = 10;
 
@@ -296,7 +300,13 @@ export async function createTemplate(
     ),
   );
 
-  return serializeTemplate(document.toObject());
+  let serialized = serializeTemplate(document.toObject());
+
+  if (options.isPublished && channel === 'WHATSAPP') {
+    serialized = await submitWhatsappTemplate(serialized);
+  }
+
+  return serialized;
 }
 
 export async function updateTemplate(
@@ -321,11 +331,33 @@ export async function updateTemplate(
     throw new TemplateNotFoundError(templateId);
   }
 
+  const existingChannel = existingTemplate.channel as SerializedMessageTemplate['channel'];
+  const existingWaStatus = existingTemplate.whatsapp?.status;
+  const isWhatsappApprovedLock =
+    existingChannel === 'WHATSAPP' &&
+    typeof existingWaStatus === 'string' &&
+    existingWaStatus.toUpperCase() === 'APPROVED';
+
+  const isArchiveOnlyMutation = (() => {
+    const keys = Object.keys(payload).filter(
+      (key) => payload[key as keyof TemplateWritePayload] !== undefined,
+    );
+    return (
+      keys.every((key) => key === 'isArchived' || key === 'isRemoved') && keys.length > 0
+    );
+  })();
+
+  if (isWhatsappApprovedLock && !isArchiveOnlyMutation) {
+    throw new TemplateLockedError(
+      'This WhatsApp template is approved on WhatsApp and can no longer be edited.',
+    );
+  }
+
   const rawSanitizedPayload = sanitizeTemplateWritePayload(payload) as TemplateWritePayload & {
     documentSubtype?: DocumentTemplateSubtypeKey;
   };
   const { channel: _ignoredChannel, ...sanitizedPayload } = rawSanitizedPayload;
-  const preservedChannel = existingTemplate.channel as SerializedMessageTemplate['channel'];
+  const preservedChannel = existingChannel;
   const mergedPayload = {
     channel: preservedChannel,
     templateType: existingTemplate.templateType,
@@ -380,5 +412,104 @@ export async function updateTemplate(
     throw new TemplateNotFoundError(templateId);
   }
 
-  return serializeTemplate(template);
+  let serialized = serializeTemplate(template);
+
+  if (options.isPublished && preservedChannel === 'WHATSAPP') {
+    serialized = await submitWhatsappTemplate(serialized);
+  }
+
+  return serialized;
+}
+
+/**
+ * Submit a freshly-published WhatsApp template to AiSensy and persist the
+ * returned template name + status. AiSensy errors don't roll back the local
+ * publish — we record the failure on the template so the UI can show it, then
+ * rethrow so the caller can return a 502.
+ */
+async function submitWhatsappTemplate(
+  template: SerializedMessageTemplate,
+): Promise<SerializedMessageTemplate> {
+  let outcome;
+  try {
+    outcome = await submitTemplateToAisensy(template);
+  } catch (error) {
+    await persistWhatsappStatus(template._id, {
+      status: 'FAILED',
+    });
+    throw error;
+  }
+
+  if (outcome.skipped) {
+    return template;
+  }
+
+  return persistWhatsappStatus(template._id, {
+    status: outcome.status,
+    templateName: outcome.templateName,
+    templateId: outcome.templateId,
+  });
+}
+
+async function persistWhatsappStatus(
+  templateId: string,
+  patch: {
+    status: string;
+    templateName?: string;
+    templateId?: string;
+  },
+): Promise<SerializedMessageTemplate> {
+  const MessageTemplate = getMessageTemplateModel();
+
+  const setFields: Record<string, unknown> = {
+    'whatsapp.status': patch.status,
+  };
+  if (patch.templateName) setFields['whatsapp.template.name'] = patch.templateName;
+  if (patch.templateId) setFields['whatsapp.template.id'] = patch.templateId;
+
+  const updated = await MessageTemplate.findOneAndUpdate(
+    {
+      ...getTemplateScopeQuery(),
+      _id: new Types.ObjectId(templateId),
+    },
+    { $set: setFields },
+    { new: true },
+  ).lean();
+
+  if (!updated?._id) {
+    throw new TemplateNotFoundError(templateId);
+  }
+
+  return serializeTemplate(updated);
+}
+
+export async function refreshTemplateStatus(templateId: string) {
+  await connectToDatabase();
+
+  if (!Types.ObjectId.isValid(templateId)) {
+    throw new TemplateNotFoundError(templateId);
+  }
+
+  const MessageTemplate = getMessageTemplateModel();
+  const existing = await MessageTemplate.findOne({
+    ...getTemplateScopeQuery(),
+    _id: new Types.ObjectId(templateId),
+  }).lean();
+
+  if (!existing?._id) {
+    throw new TemplateNotFoundError(templateId);
+  }
+
+  const waTemplateId = existing.whatsapp?.template?.id;
+  const record = await fetchTemplateStatusFromAisensy(waTemplateId);
+
+  if (!record) {
+    return serializeTemplate(existing);
+  }
+
+  return persistWhatsappStatus(existing._id.toString(), {
+    status: record.status,
+    templateName: record.name,
+    templateId: record.id,
+  });
 }

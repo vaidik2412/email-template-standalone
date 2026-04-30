@@ -28,7 +28,9 @@ import TemplateMarkdownEditor from './TemplateMarkdownEditor';
 import TemplatePlainTextEditor from './TemplatePlainTextEditor';
 import TemplateVariableMenuButton from './TemplateVariableMenuButton';
 import TemplateWhatsappPreview from './TemplateWhatsappPreview';
+import WhatsappPublishConfirmModal from './WhatsappPublishConfirmModal';
 import { useTemplateFormSubmit } from './hooks/useTemplateFormSubmit';
+import { useRefreshTemplateStatus } from './hooks/useRefreshTemplateStatus';
 import {
   DEFAULT_EMAIL_SIGNATURE,
   composeTemplateBodyWithSignature,
@@ -166,6 +168,10 @@ type TemplateHeaderActionsProps = {
   onPublish: () => void;
   onSaveDraft: () => void;
   containerRef: React.RefObject<HTMLDivElement>;
+  /** When set, the primary CTA flips to "Check Status" — used for WA templates that are already submitted to AiSensy. */
+  primaryAction?: 'publish' | 'checkStatus';
+  isCheckingStatus?: boolean;
+  onCheckStatus?: () => void;
 };
 
 function TemplateHeaderActions({
@@ -176,34 +182,42 @@ function TemplateHeaderActions({
   onPublish,
   onSaveDraft,
   containerRef,
+  primaryAction = 'publish',
+  isCheckingStatus = false,
+  onCheckStatus,
 }: TemplateHeaderActionsProps) {
+  const isCheckStatus = primaryAction === 'checkStatus';
   return (
     <div className='template-header-actions' ref={containerRef}>
       <button
         type='button'
         className='template-publish-button'
-        disabled={disabled || isSubmitting}
-        onClick={onPublish}
+        disabled={isCheckStatus ? isCheckingStatus : disabled || isSubmitting}
+        onClick={isCheckStatus ? onCheckStatus : onPublish}
       >
-        ✓ Publish Template
+        {isCheckStatus ? (isCheckingStatus ? '⟳ Checking…' : '⟳ Check Status') : '✓ Publish Template'}
       </button>
-      <button
-        type='button'
-        className='template-publish-menu-button'
-        aria-label='More template actions'
-        aria-expanded={isMenuOpen}
-        disabled={disabled || isSubmitting}
-        onClick={onToggleMenu}
-      >
-        ▾
-      </button>
-      {isMenuOpen ? (
-        <div className='template-actions-menu'>
-          <button type='button' className='template-actions-menu-item' onClick={onSaveDraft}>
-            Save as Draft
+      {isCheckStatus ? null : (
+        <>
+          <button
+            type='button'
+            className='template-publish-menu-button'
+            aria-label='More template actions'
+            aria-expanded={isMenuOpen}
+            disabled={disabled || isSubmitting}
+            onClick={onToggleMenu}
+          >
+            ▾
           </button>
-        </div>
-      ) : null}
+          {isMenuOpen ? (
+            <div className='template-actions-menu'>
+              <button type='button' className='template-actions-menu-item' onClick={onSaveDraft}>
+                Save as Draft
+              </button>
+            </div>
+          ) : null}
+        </>
+      )}
     </div>
   );
 }
@@ -219,6 +233,13 @@ export default function TemplateFormScreen({
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loadedTemplate, setLoadedTemplate] = useState<SerializedMessageTemplate | null>(null);
   const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
+  const [isWaConfirmOpen, setIsWaConfirmOpen] = useState(false);
+  const [statusCheckFeedback, setStatusCheckFeedback] = useState<{
+    status: string;
+    changed: boolean;
+    at: number;
+  } | null>(null);
+  const { refresh: refreshStatus, isRefreshing: refreshingTemplateId, refreshError } = useRefreshTemplateStatus();
   const [activeVariableTarget, setActiveVariableTarget] = useState<TemplateVariableTarget>('subject');
   const [pendingBodyVariableInsertion, setPendingBodyVariableInsertion] =
     useState<TemplateVariableInsertionRequest | null>(null);
@@ -255,6 +276,13 @@ export default function TemplateFormScreen({
       window.removeEventListener('mousedown', handleWindowClick);
     };
   }, []);
+
+  // Auto-dismiss the "status checked" toast after a few seconds.
+  useEffect(() => {
+    if (!statusCheckFeedback) return;
+    const timer = window.setTimeout(() => setStatusCheckFeedback(null), 4500);
+    return () => window.clearTimeout(timer);
+  }, [statusCheckFeedback]);
 
   useEffect(() => {
     const fetchSourceTemplate = async () => {
@@ -452,8 +480,21 @@ export default function TemplateFormScreen({
     signatureSelectionRef.current = { start, end };
   }, [formik.values.signature]);
 
+  const waStatus = (loadedTemplate?.whatsapp?.status || '').toUpperCase();
+  const isWaTemplate = loadedTemplate?.channel === 'WHATSAPP';
+  const isWaPublished = isWaTemplate && loadedTemplate?.status === 'LIVE';
+  const isWaApproved = isWaTemplate && waStatus === 'APPROVED';
+  const isWaRejected = isWaTemplate && waStatus === 'REJECTED';
+  // Show "Check Status" only while we're waiting on Meta. Once the template
+  // is APPROVED there's nothing left to check (and the form is locked); when
+  // REJECTED we drop back to "Publish Template" so the user can resubmit.
+  const showCheckStatus = isWaPublished && !isWaApproved && !isWaRejected;
+  const isFormLocked = isWaApproved;
+
   const isPublishDisabled =
-    isSubmitting || (!formik.dirty && !(loadedTemplate?.isModifiedPostPublish || false));
+    isSubmitting ||
+    isFormLocked ||
+    (!formik.dirty && !(loadedTemplate?.isModifiedPostPublish || false));
 
   const updateSelection = (
     element: HTMLInputElement | HTMLTextAreaElement,
@@ -640,7 +681,32 @@ export default function TemplateFormScreen({
       return;
     }
 
+    if (formik.values.channel === 'WHATSAPP') {
+      setIsWaConfirmOpen(true);
+      return;
+    }
+
     await formik.submitForm();
+  };
+
+  const handleConfirmWhatsappPublish = async () => {
+    setIsWaConfirmOpen(false);
+    await formik.submitForm();
+  };
+
+  const handleCheckStatus = async () => {
+    if (!templateId) return;
+    const previousStatus = (loadedTemplate?.whatsapp?.status || '').toUpperCase();
+    const next = await refreshStatus(templateId);
+    if (next) {
+      const newStatus = (next.whatsapp?.status || 'PENDING').toUpperCase();
+      setLoadedTemplate(next);
+      setStatusCheckFeedback({
+        status: newStatus,
+        changed: newStatus !== previousStatus,
+        at: Date.now(),
+      });
+    }
   };
 
   if (isBootstrapping) {
@@ -679,28 +745,81 @@ export default function TemplateFormScreen({
           </div>
         </div>
 
-        <TemplateHeaderActions
-          disabled={isPublishDisabled}
-          isMenuOpen={isActionsMenuOpen}
-          isSubmitting={isSubmitting}
-          onToggleMenu={() => {
-            setIsActionsMenuOpen((currentValue) => !currentValue);
-          }}
-          onPublish={() => {
-            void handlePublish();
-          }}
-          onSaveDraft={() => {
-            void handleDraftSave();
-          }}
-          containerRef={actionsRef}
-        />
+        {isWaApproved ? (
+          // Approved templates are read-only — no primary action makes sense.
+          // The lock banner below directs the user to duplicate instead.
+          <div className='template-header-actions' ref={actionsRef} />
+        ) : (
+          <TemplateHeaderActions
+            disabled={isPublishDisabled}
+            isMenuOpen={isActionsMenuOpen}
+            isSubmitting={isSubmitting}
+            onToggleMenu={() => {
+              setIsActionsMenuOpen((currentValue) => !currentValue);
+            }}
+            onPublish={() => {
+              void handlePublish();
+            }}
+            onSaveDraft={() => {
+              void handleDraftSave();
+            }}
+            containerRef={actionsRef}
+            primaryAction={showCheckStatus ? 'checkStatus' : 'publish'}
+            isCheckingStatus={refreshingTemplateId === templateId}
+            onCheckStatus={() => {
+              void handleCheckStatus();
+            }}
+          />
+        )}
       </div>
 
       {loadError ? <div className='template-inline-error'>{loadError}</div> : null}
+      {refreshError ? <div className='template-inline-error'>{refreshError}</div> : null}
+      {isFormLocked ? (
+        <div className='template-status-banner template-status-banner--approved'>
+          <strong>Approved by WhatsApp.</strong> This template can no longer be edited. Duplicate it
+          to start a new version.
+        </div>
+      ) : null}
+      {isWaRejected ? (
+        <div className='template-status-banner template-status-banner--rejected'>
+          <strong>Rejected by WhatsApp.</strong> Edit and resubmit for approval.
+        </div>
+      ) : null}
+      {showCheckStatus && !isWaApproved ? (
+        <div className='template-status-banner template-status-banner--pending'>
+          <strong>Submitted to WhatsApp.</strong> Waiting for Meta approval — use Check Status to refresh.
+        </div>
+      ) : null}
+      {statusCheckFeedback ? (
+        <div
+          key={statusCheckFeedback.at}
+          className={`template-status-toast template-status-toast--${statusCheckFeedback.status.toLowerCase()}`}
+          role='status'
+          aria-live='polite'
+        >
+          {statusCheckFeedback.changed
+            ? `Status updated to ${statusCheckFeedback.status}.`
+            : `Still ${statusCheckFeedback.status}. Last checked just now.`}
+        </div>
+      ) : null}
+
+      <WhatsappPublishConfirmModal
+        isOpen={isWaConfirmOpen}
+        isSubmitting={isSubmitting}
+        onCancel={() => setIsWaConfirmOpen(false)}
+        onConfirm={() => {
+          void handleConfirmWhatsappPublish();
+        }}
+      />
 
       <div className='template-content-grid template-content-grid--with-preview'>
         <section className='template-form-card'>
           <form id='template-form' className='template-form-stack' onSubmit={formik.handleSubmit}>
+            <fieldset
+              disabled={isFormLocked}
+              style={{ border: 0, padding: 0, margin: 0, opacity: isFormLocked ? 0.55 : 1 }}
+            >
             {mode === 'create' ? (
               <AiTemplatePrompt onGenerated={handleAiGenerated} />
             ) : null}
@@ -1097,6 +1216,7 @@ export default function TemplateFormScreen({
             )}
 
             {submitError ? <div className='template-inline-error'>{submitError}</div> : null}
+            </fieldset>
           </form>
         </section>
 
@@ -1110,6 +1230,7 @@ export default function TemplateFormScreen({
               footer={formik.values.whatsappFooter}
               buttonLabel={formik.values.whatsappButtonLabel}
               buttonUrl={formik.values.whatsappButtonUrl}
+              category={formik.values.whatsappCategory}
             />
           ) : (
             <TemplateEmailPreview

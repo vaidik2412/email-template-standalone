@@ -22,7 +22,7 @@ describe('TemplateWhatsappPreview', () => {
     },
   ];
 
-  it('renders resolved variables inside a single template card within the figma-style whatsapp shell', () => {
+  it('renders resolved variables inside a single template card within the whatsapp shell', () => {
     const { container } = render(
       <TemplateWhatsappPreview
         templateType='SALES_CRM'
@@ -31,11 +31,9 @@ describe('TemplateWhatsappPreview', () => {
       />,
     );
 
-    expect(screen.getByText(/whatsapp preview/i)).toBeInTheDocument();
-    expect(screen.getByText('Martha Craig')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /whatsapp preview/i })).toBeInTheDocument();
     expect(screen.getByText(/tap here for contact info/i)).toBeInTheDocument();
-    expect(screen.getByText(/fri, jul 26/i)).toBeInTheDocument();
-    expect(screen.getByText(/message/i)).toBeInTheDocument();
+    expect(screen.getByText(/today/i)).toBeInTheDocument();
     expect(screen.getByText('Hello Rahul Mehta')).toBeInTheDocument();
     expect(screen.getByText('Please review the updated details.')).toBeInTheDocument();
 
@@ -53,10 +51,12 @@ describe('TemplateWhatsappPreview', () => {
       />,
     );
 
-    expect(screen.getByText(/start writing to preview this whatsapp message/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/start writing to preview this whatsapp message/i),
+    ).toBeInTheDocument();
   });
 
-  it('renders plain share links as the footer action of the same template card', () => {
+  it('renders plain share links as the cta button of the same template card', () => {
     const { container } = render(
       <TemplateWhatsappPreview
         templateType='ACCOUNTING_DOCUMENTS'
@@ -74,7 +74,7 @@ describe('TemplateWhatsappPreview', () => {
     expect(container.querySelectorAll('.template-whatsapp-template-card')).toHaveLength(1);
   });
 
-  it('surfaces unsupported email CTA tokens with a whatsapp-specific hint', () => {
+  it('promotes a {{cta}} segment in the body to a tappable button', () => {
     render(
       <TemplateWhatsappPreview
         templateType='ACCOUNTING_DOCUMENTS'
@@ -86,6 +86,43 @@ describe('TemplateWhatsappPreview', () => {
     );
 
     expect(screen.getByRole('button', { name: /view document/i })).toBeInTheDocument();
-    expect(screen.queryByText(/buttons aren't supported in whatsapp templates yet/i)).not.toBeInTheDocument();
+  });
+
+  it('uses the explicit button label and url when provided', () => {
+    const { container } = render(
+      <TemplateWhatsappPreview
+        templateType='ACCOUNTING_DOCUMENTS'
+        body='Hi {{contact.name}}, your invoice is ready.'
+        header='Invoice INV-2026-001'
+        footer='Sent via Refrens'
+        buttonLabel='View Invoice'
+        buttonUrl='{{document.share_link}}'
+        category='UTILITY'
+        variableOptions={variableOptions}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: /view invoice/i })).toBeInTheDocument();
+    const card = container.querySelector('.template-whatsapp-template-card');
+    expect(card?.querySelector('.template-whatsapp-template-header')?.textContent).toBe(
+      'Invoice INV-2026-001',
+    );
+    expect(card?.querySelector('.template-whatsapp-template-footer')?.textContent).toBe(
+      'Sent via Refrens',
+    );
+    expect(screen.getByText('UTILITY')).toBeInTheDocument();
+  });
+
+  it('renders the category badge for marketing templates', () => {
+    render(
+      <TemplateWhatsappPreview
+        templateType='SALES_CRM'
+        body='Hello {{contact.name}}'
+        category='MARKETING'
+        variableOptions={variableOptions}
+      />,
+    );
+
+    expect(screen.getByText('MARKETING')).toBeInTheDocument();
   });
 });
