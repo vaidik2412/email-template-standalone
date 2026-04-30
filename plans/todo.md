@@ -34,3 +34,21 @@
 - Added client-side validation for any legacy unsafe WhatsApp name that somehow reaches submit.
 - Added regression coverage for typing a trailing underscore before finishing the template name.
 - Verified with targeted tests, full `npm test`, and `npm run build`.
+
+## AiSensy Template API Plan
+
+- [x] Add env-gated AiSensy server config and client tests.
+- [x] Implement AiSensy create-template and status client with safe error handling.
+- [x] Wire WhatsApp publish to submit canonical payloads only after local validation.
+- [x] Store external template id/name, approval status, submission time, sync time, and submission error fields.
+- [x] Add manual status-sync API route and service coverage.
+- [x] Surface AiSensy approval status and a sync action in the edit screen.
+- [x] Run focused tests, full suite, and production build.
+
+## AiSensy Template API Review
+
+- Publishing a WhatsApp template now calls AiSensy only when `AISENSY_TEMPLATE_API_ENABLED=true` and required URL/key env vars exist.
+- Draft saves still stay local and do not call AiSensy.
+- AiSensy errors are normalized before they reach the app and API keys are redacted from thrown messages.
+- Submitted WhatsApp templates store provider template metadata under `whatsapp.template` and approval metadata under `whatsapp.status`, `lastSubmittedAt`, and `lastSyncedAt`.
+- The edit screen now shows the AiSensy approval state with a manual `Sync status` action for submitted WhatsApp templates.

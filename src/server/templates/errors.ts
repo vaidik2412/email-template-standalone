@@ -14,3 +14,13 @@ export class TemplatePayloadValidationError extends Error {
     this.status = 400;
   }
 }
+
+export class TemplateExternalIntegrationError extends Error {
+  status: number;
+
+  constructor(message: string, status = 503) {
+    super(message);
+    this.name = 'TemplateExternalIntegrationError';
+    this.status = status;
+  }
+}

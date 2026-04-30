@@ -1,4 +1,5 @@
 import TemplateFormScreen from '@/components/templates/TemplateFormScreen';
+import { isAiSensyTemplateApiEnabled } from '@/server/config';
 import { getIndexedCustomFieldsSnapshot } from '@/server/templateVariables/service';
 
 type NewTemplatePageProps = {
@@ -16,6 +17,7 @@ export default async function NewTemplatePage({ searchParams }: NewTemplatePageP
       mode='create'
       copyFromId={resolvedSearchParams?.copyFrom}
       indexedCustomFields={indexedCustomFields}
+      aisensyTemplateApiEnabled={isAiSensyTemplateApiEnabled()}
     />
   );
 }

@@ -3,6 +3,7 @@ import { getOpenAIApiKey, getOpenAIModel } from '../config';
 import { buildTemplateVariableCatalog } from '@/data/email/templateVariables';
 import { ENABLED_EMAIL_TEMPLATE_TYPE_KEYS, EMAIL_TEMPLATE_TYPES } from '@/data/email/templateTypes';
 import type { EmailTemplateTypeKey } from '@/data/email/templateTypes';
+import { findUnsupportedTemplateVariables } from '@/utils/templateVariables';
 import {
   ACCOUNTING_DOCUMENT_SUBTYPES,
   ACCOUNTING_DOCUMENT_SUBTYPE_KEYS,
@@ -135,6 +136,12 @@ When generating templates for accounting documents (invoices, quotations, purcha
   - If channel is WHATSAPP: Do NOT put {{cta ...}} or {{document.share_link}} in the body. Instead, set the "whatsappButton" field with label and url. Example: {"label": "View Invoice", "url": "{{document.share_link}}"}
 - Address the customer by name using {{customer.name}}.
 - Mention your business name using {{business.name}}.
+
+## Sales CRM Link Rules
+For SALES_CRM WhatsApp templates:
+- Do NOT use {{document.share_link}} anywhere. That variable exists only for ACCOUNTING_DOCUMENTS.
+- Only include "whatsappButton" if the user supplied a concrete URL in their request.
+- For catalog, launch, offer, follow-up, and product messages without a provided URL, omit "whatsappButton" entirely. The user can add a static URL later.
 
 ## Output Format
 Respond with ONLY a JSON object (no markdown fences, no explanation).
@@ -302,6 +309,19 @@ When writing templates in a non-English language:
     result.whatsappFooter = parsed.whatsappFooter || undefined;
 
     if (parsed.whatsappButton?.label && parsed.whatsappButton?.url) {
+      const allowedVariableKeys = buildTemplateVariableCatalog({
+        templateType,
+        documentSubtype,
+      }).options.map((option) => option.value);
+      const unsupportedButtonVariables = findUnsupportedTemplateVariables(
+        parsed.whatsappButton.url,
+        allowedVariableKeys,
+      );
+
+      if (unsupportedButtonVariables.length) {
+        return result;
+      }
+
       result.whatsappButton = {
         label: parsed.whatsappButton.label,
         url: parsed.whatsappButton.url,

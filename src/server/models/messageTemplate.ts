@@ -86,6 +86,9 @@ const whatsappSchema = new Schema(
       type: String,
       default: 'PENDING',
     },
+    lastSubmittedAt: Schema.Types.Date,
+    lastSyncedAt: Schema.Types.Date,
+    submissionError: String,
     // Custom template fields (for user-authored WhatsApp templates)
     category: {
       type: String,

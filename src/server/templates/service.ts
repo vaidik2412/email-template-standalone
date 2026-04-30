@@ -9,13 +9,19 @@ import type {
   TemplateWritePayload,
 } from '@/types/messageTemplate';
 
+import { getAiSensyTemplateApiConfig } from '../config';
 import { connectToDatabase } from '../db';
 import { FIXED_APP_CONTEXT } from '../constants/fixedContext';
 import { getMessageTemplateModel } from '../models/messageTemplate';
 import { applyTemplateMutation } from './mutations';
-import { TemplateNotFoundError, TemplatePayloadValidationError } from './errors';
+import {
+  TemplateExternalIntegrationError,
+  TemplateNotFoundError,
+  TemplatePayloadValidationError,
+} from './errors';
 import { getTemplateScopeQuery, getVisibleTemplateQuery } from './queries';
 import { validateTemplateVariableUsage } from '../templateVariables/service';
+import { getWhatsappTemplateStatus, submitWhatsappTemplate } from '../aisensy/templateClient';
 import {
   buildWhatsappTemplateSubmissionPayload,
   WhatsappTemplateSubmissionValidationError,
@@ -124,6 +130,13 @@ function serializeTemplate(template: any): SerializedMessageTemplate {
           number: template.whatsapp.number,
           media: template.whatsapp.media,
           status: template.whatsapp.status,
+          lastSubmittedAt: template.whatsapp.lastSubmittedAt
+            ? new Date(template.whatsapp.lastSubmittedAt).toISOString()
+            : undefined,
+          lastSyncedAt: template.whatsapp.lastSyncedAt
+            ? new Date(template.whatsapp.lastSyncedAt).toISOString()
+            : undefined,
+          submissionError: template.whatsapp.submissionError,
         }
       : undefined,
     createdAt: new Date(template.createdAt).toISOString(),
@@ -217,7 +230,7 @@ async function ensureDefaultWhatsappTemplates() {
   await MessageTemplate.insertMany(payload);
 }
 
-function validateWhatsappPublishPayload(input: {
+function buildValidatedWhatsappPublishPayload(input: {
   channel: SerializedMessageTemplate['channel'];
   isPublished?: boolean;
   name?: string;
@@ -227,11 +240,11 @@ function validateWhatsappPublishPayload(input: {
   whatsapp?: TemplateWritePayload['whatsapp'];
 }) {
   if (!input.isPublished || input.channel !== 'WHATSAPP') {
-    return;
+    return undefined;
   }
 
   try {
-    buildWhatsappTemplateSubmissionPayload({
+    return buildWhatsappTemplateSubmissionPayload({
       name: input.name,
       body: input.body,
       templateType: input.templateType,
@@ -245,6 +258,46 @@ function validateWhatsappPublishPayload(input: {
 
     throw error;
   }
+}
+
+async function buildWhatsappSubmissionMetadata(input: Parameters<typeof buildValidatedWhatsappPublishPayload>[0]) {
+  const payload = buildValidatedWhatsappPublishPayload(input);
+
+  if (!payload) {
+    return undefined;
+  }
+
+  const config = getAiSensyTemplateApiConfig();
+
+  if (!config.enabled) {
+    throw new TemplateExternalIntegrationError(
+      'AiSensy template API is not configured. Set AISENSY_TEMPLATE_API_ENABLED=true before publishing WhatsApp templates.',
+    );
+  }
+
+  const result = await submitWhatsappTemplate(payload, config);
+
+  return {
+    template: {
+      id: result.id,
+      name: result.name || payload.name,
+    },
+    variables: payload.components.flatMap((component) => {
+      if (component.type === 'BUTTONS') {
+        return component.buttons.flatMap((button) => button.variables);
+      }
+
+      if ('variables' in component) {
+        return component.variables;
+      }
+
+      return [];
+    }),
+    status: result.status || 'PENDING',
+    lastSubmittedAt: new Date(),
+    lastSyncedAt: undefined,
+    submissionError: undefined,
+  };
 }
 
 export async function listTemplates(): Promise<TemplateListResponse> {
@@ -314,7 +367,7 @@ export async function createTemplate(
     body: normalizedPayload.body,
   });
 
-  validateWhatsappPublishPayload({
+  const whatsappSubmissionMetadata = await buildWhatsappSubmissionMetadata({
     channel,
     isPublished: options.isPublished,
     name: normalizedPayload.name,
@@ -328,6 +381,12 @@ export async function createTemplate(
     applyTemplateMutation(
       {
         ...normalizedPayload,
+        whatsapp: whatsappSubmissionMetadata
+          ? {
+              ...normalizedPayload.whatsapp,
+              ...whatsappSubmissionMetadata,
+            }
+          : normalizedPayload.whatsapp,
         subject: channel === 'EMAIL' ? normalizedPayload.subject : undefined,
         channel,
         business: businessId,
@@ -396,7 +455,7 @@ export async function updateTemplate(
     body: normalizedPayload.body,
   });
 
-  validateWhatsappPublishPayload({
+  const whatsappSubmissionMetadata = await buildWhatsappSubmissionMetadata({
     channel: preservedChannel,
     isPublished: options.isPublished,
     name: normalizedPayload.name,
@@ -412,10 +471,21 @@ export async function updateTemplate(
       _id: new Types.ObjectId(templateId),
     },
     {
-      $set: applyTemplateMutation(sanitizedPayload, {
-        actorId,
-        isPublished: options.isPublished,
-      }),
+      $set: applyTemplateMutation(
+        {
+          ...sanitizedPayload,
+          whatsapp: whatsappSubmissionMetadata
+            ? {
+                ...normalizedPayload.whatsapp,
+                ...whatsappSubmissionMetadata,
+              }
+            : sanitizedPayload.whatsapp,
+        },
+        {
+          actorId,
+          isPublished: options.isPublished,
+        },
+      ),
       ...(normalizedPayload.templateType === 'ACCOUNTING_DOCUMENTS'
         ? {}
         : {
@@ -423,6 +493,68 @@ export async function updateTemplate(
               documentSubtype: 1,
             },
           }),
+    },
+    {
+      new: true,
+      runValidators: true,
+    },
+  ).lean();
+
+  if (!template?._id) {
+    throw new TemplateNotFoundError(templateId);
+  }
+
+  return serializeTemplate(template);
+}
+
+export async function syncWhatsappTemplateStatus(templateId: string) {
+  await connectToDatabase();
+
+  if (!Types.ObjectId.isValid(templateId)) {
+    throw new TemplateNotFoundError(templateId);
+  }
+
+  const MessageTemplate = getMessageTemplateModel();
+  const existingTemplate = await MessageTemplate.findOne({
+    ...getTemplateScopeQuery(),
+    _id: new Types.ObjectId(templateId),
+  }).lean();
+
+  if (!existingTemplate?._id) {
+    throw new TemplateNotFoundError(templateId);
+  }
+
+  if (existingTemplate.channel !== 'WHATSAPP') {
+    throw new TemplatePayloadValidationError('Only WhatsApp templates can sync approval status.');
+  }
+
+  const templateIdFromProvider = existingTemplate.whatsapp?.template?.id;
+  const templateNameFromProvider = existingTemplate.whatsapp?.template?.name;
+
+  if (!templateIdFromProvider && !templateNameFromProvider) {
+    throw new TemplatePayloadValidationError('WhatsApp template has not been submitted to AiSensy.');
+  }
+
+  const statusResult = await getWhatsappTemplateStatus(
+    {
+      templateId: templateIdFromProvider,
+      templateName: templateNameFromProvider,
+    },
+    getAiSensyTemplateApiConfig(),
+  );
+  const template = await MessageTemplate.findOneAndUpdate(
+    {
+      ...getTemplateScopeQuery(),
+      _id: new Types.ObjectId(templateId),
+    },
+    {
+      $set: {
+        'whatsapp.status': statusResult.status || existingTemplate.whatsapp?.status || 'PENDING',
+        'whatsapp.template.id': statusResult.id || templateIdFromProvider,
+        'whatsapp.template.name': statusResult.name || templateNameFromProvider,
+        'whatsapp.lastSyncedAt': new Date(),
+        'whatsapp.submissionError': undefined,
+      },
     },
     {
       new: true,

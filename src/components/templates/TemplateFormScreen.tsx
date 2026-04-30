@@ -52,6 +52,7 @@ type TemplateFormScreenProps = {
   templateId?: string;
   copyFromId?: string;
   indexedCustomFields?: IndexedCustomFieldsByCategory;
+  aisensyTemplateApiEnabled?: boolean;
 };
 
 type WhatsappCategory = 'MARKETING' | 'UTILITY';
@@ -224,12 +225,15 @@ export default function TemplateFormScreen({
   templateId,
   copyFromId,
   indexedCustomFields = {},
+  aisensyTemplateApiEnabled = true,
 }: TemplateFormScreenProps) {
   const [initialValues, setInitialValues] = useState<TemplateFormValues>(defaultValues);
   const [isBootstrapping, setIsBootstrapping] = useState(mode === 'edit' || Boolean(copyFromId));
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loadedTemplate, setLoadedTemplate] = useState<SerializedMessageTemplate | null>(null);
   const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
+  const [isSyncingWhatsappStatus, setIsSyncingWhatsappStatus] = useState(false);
+  const [whatsappStatusSyncError, setWhatsappStatusSyncError] = useState<string | null>(null);
   const [activeVariableTarget, setActiveVariableTarget] = useState<TemplateVariableTarget>('subject');
   const [pendingBodyVariableInsertion, setPendingBodyVariableInsertion] =
     useState<TemplateVariableInsertionRequest | null>(null);
@@ -394,6 +398,25 @@ export default function TemplateFormScreen({
     () => removeMarkdownEditorsInternalVariables(formik.values.body).trim(),
     [formik.values.body],
   );
+  const hasWhatsappProviderTemplate = Boolean(
+    formik.values.channel === 'WHATSAPP' &&
+      (loadedTemplate?.whatsapp?.template?.id || loadedTemplate?.whatsapp?.template?.name),
+  );
+  const whatsappApprovalStatus = loadedTemplate?.whatsapp?.status || 'PENDING';
+  const showAiSensyNotConfiguredNotice =
+    formik.values.channel === 'WHATSAPP' && !aisensyTemplateApiEnabled;
+  const whatsappButtonHelperText =
+    formik.values.templateType === 'ACCOUNTING_DOCUMENTS'
+      ? 'Add a tappable CTA button. Use the Add variable menu to insert a document share link.'
+      : 'Add a tappable CTA button with a static URL for catalog, offer, or landing-page links.';
+  const whatsappButtonUrlHelperText =
+    formik.values.templateType === 'ACCOUNTING_DOCUMENTS'
+      ? 'Use a document share link variable or a full URL.'
+      : 'Use a full URL, such as https://example.com/catalog. Document share links are only available for Accounting Documents.';
+  const whatsappButtonUrlPlaceholder =
+    formik.values.templateType === 'ACCOUNTING_DOCUMENTS'
+      ? '{{document.share_link}}'
+      : 'https://example.com/catalog';
 
   const buildTemplatePayload = (values: TemplateFormValues): TemplateWritePayload => {
     const normalizedBody = removeMarkdownEditorsInternalVariables(values.body);
@@ -675,6 +698,44 @@ export default function TemplateFormScreen({
     await formik.submitForm();
   };
 
+  const handleWhatsappStatusSync = async () => {
+    if (!templateId || !hasWhatsappProviderTemplate) {
+      return;
+    }
+
+    if (!aisensyTemplateApiEnabled) {
+      setWhatsappStatusSyncError('AiSensy not configured. Enable AISENSY_TEMPLATE_API_ENABLED to sync status.');
+      return;
+    }
+
+    setWhatsappStatusSyncError(null);
+    setIsSyncingWhatsappStatus(true);
+
+    try {
+      const response = await fetch(`/api/templates/${templateId}/whatsapp/status`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+      });
+      const template = (await response.json()) as SerializedMessageTemplate & {
+        message?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(template.message || 'Unable to sync WhatsApp status');
+      }
+
+      setLoadedTemplate(template);
+    } catch (error) {
+      setWhatsappStatusSyncError(
+        error instanceof Error ? error.message : 'Unable to sync WhatsApp status',
+      );
+    } finally {
+      setIsSyncingWhatsappStatus(false);
+    }
+  };
+
   if (isBootstrapping) {
     return (
       <main className='template-screen-shell'>
@@ -877,6 +938,45 @@ export default function TemplateFormScreen({
               ) : null}
             </div>
 
+            {hasWhatsappProviderTemplate ? (
+              <div className='whatsapp-approval-panel'>
+                <div>
+                  <p className='whatsapp-approval-status'>
+                    AiSensy approval: {whatsappApprovalStatus}
+                  </p>
+                  {loadedTemplate?.whatsapp?.lastSyncedAt ? (
+                    <p className='helper-text'>
+                      Last synced {new Date(loadedTemplate.whatsapp.lastSyncedAt).toLocaleString()}
+                    </p>
+                  ) : loadedTemplate?.whatsapp?.lastSubmittedAt ? (
+                    <p className='helper-text'>
+                      Submitted {new Date(loadedTemplate.whatsapp.lastSubmittedAt).toLocaleString()}
+                    </p>
+                  ) : null}
+                </div>
+                <button
+                  type='button'
+                  className='inline-secondary-button'
+                  disabled={isSyncingWhatsappStatus || !aisensyTemplateApiEnabled}
+                  onClick={() => {
+                    void handleWhatsappStatusSync();
+                  }}
+                >
+                  {isSyncingWhatsappStatus ? 'Syncing...' : 'Sync status'}
+                </button>
+                {whatsappStatusSyncError ? (
+                  <div className='field-error'>{whatsappStatusSyncError}</div>
+                ) : null}
+              </div>
+            ) : null}
+
+            {showAiSensyNotConfiguredNotice ? (
+              <div className='whatsapp-config-notice'>
+                AiSensy not configured. WhatsApp drafts can be saved, but publishing and status sync
+                require `AISENSY_TEMPLATE_API_ENABLED=true`.
+              </div>
+            ) : null}
+
             <div className='template-form-variable-actions'>
               <TemplateVariableMenuButton
                 buttonLabel='Add variable'
@@ -1049,7 +1149,7 @@ export default function TemplateFormScreen({
 
                 <fieldset className='whatsapp-button-fieldset'>
                   <legend className='field-label'>Button (Optional)</legend>
-                  <p className='helper-text'>Add a tappable CTA button. Use the Add variable menu to insert a document share link.</p>
+                  <p className='helper-text'>{whatsappButtonHelperText}</p>
                   <div className='whatsapp-button-fields'>
                     <div className='field-group'>
                       <label className='field-label field-label--small' htmlFor='whatsappButtonLabel'>
@@ -1077,11 +1177,12 @@ export default function TemplateFormScreen({
                       <label className='field-label field-label--small' htmlFor='whatsappButtonUrl'>
                         URL
                       </label>
+                      <p className='helper-text'>{whatsappButtonUrlHelperText}</p>
                       <input
                         id='whatsappButtonUrl'
                         name='whatsappButtonUrl'
                         className='text-input'
-                        placeholder='e.g. {{document.share_link}}'
+                        placeholder={`e.g. ${whatsappButtonUrlPlaceholder}`}
                         value={formik.values.whatsappButtonUrl}
                         onChange={formik.handleChange}
                         onBlur={formik.handleBlur}

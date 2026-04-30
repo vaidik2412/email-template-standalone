@@ -177,4 +177,90 @@ describe('TemplateFormScreen in edit mode', () => {
     });
     expect(payload).not.toHaveProperty('subject');
   });
+
+  it('shows and syncs AiSensy approval status for submitted whatsapp templates', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          _id: 'template-whatsapp',
+          name: 'whatsapp_reminder',
+          subject: '',
+          body: 'Hello {{contact.name}}',
+          templateType: 'SALES_CRM',
+          status: 'LIVE',
+          channel: 'WHATSAPP',
+          isModifiedPostPublish: false,
+          isDefault: false,
+          isArchived: false,
+          isRemoved: false,
+          whatsapp: {
+            template: {
+              id: 'tpl_123',
+              name: 'whatsapp_reminder',
+            },
+            status: 'PENDING',
+            lastSubmittedAt: '2026-04-30T00:00:00.000Z',
+          },
+          createdAt: '2026-03-21T00:00:00.000Z',
+          updatedAt: '2026-03-21T00:00:00.000Z',
+          business: {
+            _id: 'business-1',
+            urlKey: 'demo-business',
+            name: 'Refrens Demo Business',
+          },
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          _id: 'template-whatsapp',
+          name: 'whatsapp_reminder',
+          subject: '',
+          body: 'Hello {{contact.name}}',
+          templateType: 'SALES_CRM',
+          status: 'LIVE',
+          channel: 'WHATSAPP',
+          isModifiedPostPublish: false,
+          isDefault: false,
+          isArchived: false,
+          isRemoved: false,
+          whatsapp: {
+            template: {
+              id: 'tpl_123',
+              name: 'whatsapp_reminder',
+            },
+            status: 'APPROVED',
+            lastSyncedAt: '2026-04-30T00:05:00.000Z',
+          },
+          createdAt: '2026-03-21T00:00:00.000Z',
+          updatedAt: '2026-03-21T00:00:00.000Z',
+          business: {
+            _id: 'business-1',
+            urlKey: 'demo-business',
+            name: 'Refrens Demo Business',
+          },
+        }),
+      });
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<TemplateFormScreen mode='edit' templateId='template-whatsapp' />);
+
+    expect(await screen.findByText(/aisensy approval: pending/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /sync status/i }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/templates/template-whatsapp/whatsapp/status',
+        expect.objectContaining({
+          method: 'POST',
+        }),
+      );
+    });
+
+    expect(await screen.findByText(/aisensy approval: approved/i)).toBeInTheDocument();
+  });
 });

@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { getServerConfig, getOpenAIApiKey, getOpenAIModel } from '../config';
+import {
+  getAiSensyTemplateApiConfig,
+  getServerConfig,
+  getOpenAIApiKey,
+  getOpenAIModel,
+  isAiSensyTemplateApiEnabled,
+} from '../config';
 import { FIXED_APP_CONTEXT } from '../constants/fixedContext';
 
 describe('server config', () => {
@@ -53,5 +59,47 @@ describe('server config', () => {
 
   it('getOpenAIModel returns configured model', () => {
     expect(getOpenAIModel({ APP_OPENAI_MODEL: 'gpt-5.4-nano' })).toBe('gpt-5.4-nano');
+  });
+
+  it('returns disabled AiSensy template config unless explicitly enabled', () => {
+    const env = {
+      AISENSY_PROJECT_API_KEY: 'aisensy-key',
+      AISENSY_TEMPLATE_CREATE_URL: 'https://aisensy.test/templates',
+      AISENSY_TEMPLATE_STATUS_URL: 'https://aisensy.test/templates/status',
+    };
+
+    expect(getAiSensyTemplateApiConfig(env)).toEqual({
+      enabled: false,
+      apiKey: 'aisensy-key',
+      createUrl: 'https://aisensy.test/templates',
+      statusUrl: 'https://aisensy.test/templates/status',
+    });
+    expect(isAiSensyTemplateApiEnabled(env)).toBe(false);
+  });
+
+  it('requires all AiSensy fields when template api is enabled', () => {
+    expect(() =>
+      getAiSensyTemplateApiConfig({
+        AISENSY_TEMPLATE_API_ENABLED: 'true',
+        AISENSY_PROJECT_API_KEY: 'aisensy-key',
+      }),
+    ).toThrow('AISENSY_TEMPLATE_CREATE_URL is required');
+  });
+
+  it('returns enabled AiSensy template config', () => {
+    const env = {
+      AISENSY_TEMPLATE_API_ENABLED: 'true',
+      AISENSY_PROJECT_API_KEY: 'aisensy-key',
+      AISENSY_TEMPLATE_CREATE_URL: 'https://aisensy.test/templates',
+      AISENSY_TEMPLATE_STATUS_URL: 'https://aisensy.test/templates/status',
+    };
+
+    expect(getAiSensyTemplateApiConfig(env)).toEqual({
+      enabled: true,
+      apiKey: 'aisensy-key',
+      createUrl: 'https://aisensy.test/templates',
+      statusUrl: 'https://aisensy.test/templates/status',
+    });
+    expect(isAiSensyTemplateApiEnabled(env)).toBe(true);
   });
 });

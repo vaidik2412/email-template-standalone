@@ -1,4 +1,5 @@
 import TemplateFormScreen from '@/components/templates/TemplateFormScreen';
+import { isAiSensyTemplateApiEnabled } from '@/server/config';
 import { getIndexedCustomFieldsSnapshot } from '@/server/templateVariables/service';
 
 type EditTemplatePageProps = {
@@ -16,6 +17,7 @@ export default async function EditTemplatePage({ params }: EditTemplatePageProps
       mode='edit'
       templateId={resolvedParams.id}
       indexedCustomFields={indexedCustomFields}
+      aisensyTemplateApiEnabled={isAiSensyTemplateApiEnabled()}
     />
   );
 }

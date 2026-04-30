@@ -1,14 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { createTemplate, listTemplates, getTemplateById, updateTemplate } from '@/server/templates/service';
+import {
+  createTemplate,
+  listTemplates,
+  getTemplateById,
+  syncWhatsappTemplateStatus,
+  updateTemplate,
+} from '@/server/templates/service';
 import { TemplatePayloadValidationError } from '@/server/templates/errors';
 import { GET as getTemplates, POST as postTemplate } from '../route';
 import { GET as getTemplate, PATCH as patchTemplate } from '../[id]/route';
+import { POST as syncWhatsappStatus } from '../[id]/whatsapp/status/route';
 
 vi.mock('@/server/templates/service', () => ({
   listTemplates: vi.fn(),
   createTemplate: vi.fn(),
   getTemplateById: vi.fn(),
+  syncWhatsappTemplateStatus: vi.fn(),
   updateTemplate: vi.fn(),
 }));
 
@@ -242,6 +250,61 @@ describe('templates API routes', () => {
     expect(response.status).toBe(400);
     expect(await response.json()).toEqual({
       message: 'Invalid CTA button',
+    });
+  });
+
+  it('syncs whatsapp approval status for one template', async () => {
+    vi.mocked(syncWhatsappTemplateStatus).mockResolvedValue({
+      _id: 'template-whatsapp',
+      name: 'invoice_reminder',
+      channel: 'WHATSAPP',
+      whatsapp: {
+        status: 'APPROVED',
+      },
+    });
+
+    const response = await syncWhatsappStatus(
+      new Request('http://localhost/api/templates/template-whatsapp/whatsapp/status', {
+        method: 'POST',
+      }),
+      {
+        params: Promise.resolve({
+          id: 'template-whatsapp',
+        }),
+      },
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      _id: 'template-whatsapp',
+      name: 'invoice_reminder',
+      channel: 'WHATSAPP',
+      whatsapp: {
+        status: 'APPROVED',
+      },
+    });
+    expect(syncWhatsappTemplateStatus).toHaveBeenCalledWith('template-whatsapp');
+  });
+
+  it('returns a JSON error payload when whatsapp status sync fails', async () => {
+    vi.mocked(syncWhatsappTemplateStatus).mockRejectedValue(
+      new TemplatePayloadValidationError('WhatsApp template has not been submitted to AiSensy.'),
+    );
+
+    const response = await syncWhatsappStatus(
+      new Request('http://localhost/api/templates/template-whatsapp/whatsapp/status', {
+        method: 'POST',
+      }),
+      {
+        params: Promise.resolve({
+          id: 'template-whatsapp',
+        }),
+      },
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      message: 'WhatsApp template has not been submitted to AiSensy.',
     });
   });
 });

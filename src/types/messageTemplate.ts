@@ -54,6 +54,9 @@ export type SerializedMessageTemplate = {
     number?: string;
     media?: { urlPath?: string; filenamePath?: string };
     status?: string;
+    lastSubmittedAt?: string;
+    lastSyncedAt?: string;
+    submissionError?: string;
   };
   createdAt: string;
   updatedAt: string;

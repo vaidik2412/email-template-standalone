@@ -601,6 +601,38 @@ button {
   align-items: start;
 }
 
+.whatsapp-approval-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 14px 16px;
+  border: 1px solid rgba(47, 87, 229, 0.18);
+  border-radius: 8px;
+  background: rgba(238, 243, 255, 0.56);
+}
+
+.whatsapp-approval-panel > .field-error {
+  grid-column: 1 / -1;
+}
+
+.whatsapp-approval-status {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+.whatsapp-config-notice {
+  padding: 12px 14px;
+  border: 1px solid rgba(189, 128, 35, 0.24);
+  border-radius: 8px;
+  background: rgba(255, 247, 237, 0.72);
+  color: #8a4b13;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 .field-label--small {
   font-size: 12px;
 }

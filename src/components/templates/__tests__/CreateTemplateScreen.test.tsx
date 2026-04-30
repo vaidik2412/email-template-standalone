@@ -361,6 +361,9 @@ describe('TemplateFormScreen in create mode', () => {
     expect(screen.queryByRole('button', { name: /insert button/i })).not.toBeInTheDocument();
     expect(screen.getByText(/whatsapp preview/i)).toBeInTheDocument();
     expect(screen.getByText(/0\s*\/\s*1024/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/use a full url, such as https:\/\/example\.com\/catalog/i),
+    ).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText(/template name/i), {
       target: { value: 'WhatsApp reminder' },
