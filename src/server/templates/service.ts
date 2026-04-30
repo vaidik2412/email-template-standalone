@@ -13,13 +13,14 @@ import { connectToDatabase } from '../db';
 import { FIXED_APP_CONTEXT } from '../constants/fixedContext';
 import { getMessageTemplateModel } from '../models/messageTemplate';
 import { applyTemplateMutation } from './mutations';
-import { TemplateLockedError, TemplateNotFoundError } from './errors';
+import { TemplateLockedError, TemplateNotFoundError, TemplatePayloadValidationError } from './errors';
 import { getTemplateScopeQuery, getVisibleTemplateQuery } from './queries';
 import { validateTemplateVariableUsage } from '../templateVariables/service';
 import {
   fetchTemplateStatusFromAisensy,
   submitTemplateToAisensy,
 } from '../aisensy/publishTemplate';
+import { validateWhatsappTemplateForSubmission } from '../whatsapp/submission';
 
 const DEFAULT_LIMIT = 10;
 
@@ -284,6 +285,16 @@ export async function createTemplate(
     body: normalizedPayload.body,
   });
 
+  if (options.isPublished && channel === 'WHATSAPP') {
+    assertWhatsappPublishable({
+      name: normalizedPayload.name,
+      body: normalizedPayload.body,
+      templateType: normalizedPayload.templateType as SerializedMessageTemplate['templateType'],
+      documentSubtype: normalizedPayload.documentSubtype,
+      whatsapp: normalizedPayload.whatsapp,
+    });
+  }
+
   const document = await MessageTemplate.create(
     applyTemplateMutation(
       {
@@ -383,6 +394,16 @@ export async function updateTemplate(
     subject: preservedChannel === 'EMAIL' ? normalizedPayload.subject : undefined,
     body: normalizedPayload.body,
   });
+
+  if (options.isPublished && preservedChannel === 'WHATSAPP') {
+    assertWhatsappPublishable({
+      name: normalizedPayload.name ?? existingTemplate.name,
+      body: normalizedPayload.body,
+      templateType: normalizedPayload.templateType as SerializedMessageTemplate['templateType'],
+      documentSubtype: normalizedPayload.documentSubtype,
+      whatsapp: normalizedPayload.whatsapp,
+    });
+  }
 
   const template = await MessageTemplate.findOneAndUpdate(
     {
@@ -512,4 +533,23 @@ export async function refreshTemplateStatus(templateId: string) {
     templateName: record.name,
     templateId: record.id,
   });
+}
+
+/**
+ * Run the publish-time WhatsApp validator and convert any errors into the
+ * existing `TemplatePayloadValidationError` (HTTP 400) so the form surfaces
+ * them inline. Drafts skip this — only the publish path enforces the hard
+ * provider constraints.
+ */
+function assertWhatsappPublishable(input: {
+  name?: string;
+  body?: string;
+  templateType?: SerializedMessageTemplate['templateType'];
+  documentSubtype?: DocumentTemplateSubtypeKey;
+  whatsapp?: TemplateWritePayload['whatsapp'];
+}) {
+  const errors = validateWhatsappTemplateForSubmission(input);
+  if (errors.length) {
+    throw new TemplatePayloadValidationError(errors.join(' '));
+  }
 }
