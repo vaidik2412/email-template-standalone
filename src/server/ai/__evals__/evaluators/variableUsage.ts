@@ -20,9 +20,12 @@ const ACCOUNTING_VARIABLES = new Set([
   'document.due_date',
   'document.total',
   'document.currency',
+  'document.total_with_currency',
   'document.share_link',
   'document.amount_paid',
   'document.amount_due',
+  'document.amount_paid_with_currency',
+  'document.amount_due_with_currency',
   'customer.name',
   'customer.email',
   'customer.phone',
@@ -32,6 +35,7 @@ const ACCOUNTING_VARIABLES = new Set([
 ]);
 
 const VARIABLE_PATTERN = /\{\{([a-z_]+\.[a-z_]+)\}\}/gi;
+const ADJACENT_VARIABLES_PATTERN = /\{\{([^}]+)\}\}\s+\{\{([^}]+)\}\}/;
 
 function extractVariables(text: string): string[] {
   const matches = [...text.matchAll(VARIABLE_PATTERN)];
@@ -85,49 +89,31 @@ export function noHallucinatedVariables(result: GenerateTemplateResult): EvalSco
   };
 }
 
-export function currencyBeforeAmount(result: GenerateTemplateResult): EvalScore {
+/**
+ * WhatsApp/Meta rejects body text where two `{{variable}}` placeholders are
+ * separated only by whitespace (the AiSensy-surfaced error reads "Invalid
+ * parameter ordering"). The `*_with_currency` variants exist so the model
+ * never has to pair {{document.currency}} with a bare amount.
+ */
+export function noAdjacentVariables(result: GenerateTemplateResult): EvalScore {
   const body = result.body || '';
-  const amountVars = ['document.total', 'document.amount_due', 'document.amount_paid'];
+  const match = ADJACENT_VARIABLES_PATTERN.exec(body);
 
-  for (const amountVar of amountVars) {
-    const amountToken = `{{${amountVar}}}`;
-    const currencyToken = '{{document.currency}}';
-
-    if (!body.includes(amountToken)) {
-      continue;
-    }
-
-    const amountIndex = body.indexOf(amountToken);
-    // Find the closest preceding currency token
-    const precedingText = body.substring(0, amountIndex);
-    const lastCurrencyIndex = precedingText.lastIndexOf(currencyToken);
-
-    if (lastCurrencyIndex === -1) {
-      return {
-        key: 'currency_before_amount',
-        score: 0,
-        comment: `${amountToken} used without preceding ${currencyToken}`,
-      };
-    }
-
-    // Verify currency is close to amount (within ~50 chars, on same line)
-    const gap = amountIndex - (lastCurrencyIndex + currencyToken.length);
-    if (gap > 50) {
-      return {
-        key: 'currency_before_amount',
-        score: 0,
-        comment: `${currencyToken} too far from ${amountToken} (${gap} chars apart)`,
-      };
-    }
+  if (!match) {
+    return { key: 'no_adjacent_variables', score: 1 };
   }
 
-  return { key: 'currency_before_amount', score: 1 };
+  return {
+    key: 'no_adjacent_variables',
+    score: 0,
+    comment: `Body has adjacent variables {{${match[1].trim()}}} and {{${match[2].trim()}}}; use a "_with_currency" variant or insert static text.`,
+  };
 }
 
 export function runVariableEvals(result: GenerateTemplateResult): EvalScore[] {
   return [
     onlyAllowedVariables(result),
     noHallucinatedVariables(result),
-    currencyBeforeAmount(result),
+    noAdjacentVariables(result),
   ];
 }

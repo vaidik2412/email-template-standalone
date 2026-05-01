@@ -3,6 +3,7 @@ import { findUnsupportedTemplateVariables } from './templateVariables';
 
 type TemplateFieldKind = 'subject' | 'body' | 'signature';
 const WHATSAPP_TEMPLATE_BODY_MAX_LENGTH = 1024;
+const WHATSAPP_ADJACENT_VARIABLES_PATTERN = /\{\{([^}]+)\}\}\s*\{\{([^}]+)\}\}/;
 
 export function getTemplateFieldValidationError(input: {
   channel?: 'EMAIL' | 'WHATSAPP';
@@ -22,6 +23,15 @@ export function getTemplateFieldValidationError(input: {
 
   if (channel === 'WHATSAPP' && fieldKind === 'body' && value.length > WHATSAPP_TEMPLATE_BODY_MAX_LENGTH) {
     return `WhatsApp message can be at most ${WHATSAPP_TEMPLATE_BODY_MAX_LENGTH} characters.`;
+  }
+
+  if (channel === 'WHATSAPP' && fieldKind === 'body') {
+    const adjacentMatch = WHATSAPP_ADJACENT_VARIABLES_PATTERN.exec(value);
+    if (adjacentMatch) {
+      const first = adjacentMatch[1].trim();
+      const second = adjacentMatch[2].trim();
+      return `Variables cannot be placed next to each other. Add static text between {{${first}}} and {{${second}}}.`;
+    }
   }
 
   if (fieldKind !== 'body' && hasTemplateCtaTokens(value)) {
