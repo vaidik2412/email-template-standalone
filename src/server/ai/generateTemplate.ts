@@ -124,10 +124,10 @@ ${docVars}
 ## Document Sharing Rules (for ACCOUNTING_DOCUMENTS only)
 When generating templates for accounting documents (invoices, quotations, purchase orders, etc.):
 - ALWAYS present document details as a bulleted list with bold labels. This applies to BOTH email and WhatsApp channels.
-- For EMAIL, use markdown bullets: "\\n\\n- **Invoice Number:** {{document.number}}\\n- **Invoice Date:** {{document.date}}\\n- **Due Date:** {{document.due_date}}\\n- **Total Amount:** {{document.currency}} {{document.total}}\\n\\n"
-- For WHATSAPP, use plain text bullets with dash: "\\n\\n- Invoice Number: {{document.number}}\\n- Invoice Date: {{document.date}}\\n- Due Date: {{document.due_date}}\\n- Total Amount: {{document.currency}} {{document.total}}\\n\\n"
-- If amount due/paid tokens are available for the subtype, include them as additional bullet items.
-- ALWAYS put currency BEFORE amount: {{document.currency}} {{document.total}}, {{document.currency}} {{document.amount_due}}, etc. Never the other way round.
+- For EMAIL, use markdown bullets: "\\n\\n- **Invoice Number:** {{document.number}}\\n- **Invoice Date:** {{document.date}}\\n- **Due Date:** {{document.due_date}}\\n- **Total Amount:** {{document.total_with_currency}}\\n\\n"
+- For WHATSAPP, use plain text bullets with dash: "\\n\\n- Invoice Number: {{document.number}}\\n- Invoice Date: {{document.date}}\\n- Due Date: {{document.due_date}}\\n- Total Amount: {{document.total_with_currency}}\\n\\n"
+- If amount due/paid tokens are available for the subtype, include them as additional bullet items using {{document.amount_due_with_currency}} and {{document.amount_paid_with_currency}}.
+- ALWAYS use the pre-formatted "_with_currency" variants ({{document.total_with_currency}}, {{document.amount_due_with_currency}}, {{document.amount_paid_with_currency}}) instead of pairing {{document.currency}} with the bare amount. WhatsApp rejects two adjacent variables, so {{document.currency}} {{document.total}} is invalid.
 - For the document share link, the format DEPENDS on the channel:
   - If channel is EMAIL: Use this CTA button token in the body (do NOT use {{document.share_link}} as plain text):
     {{cta label="View Invoice" url="{{document.share_link}}" bg="#7d42df" text="#ffffff"}}

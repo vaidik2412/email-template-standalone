@@ -28,7 +28,7 @@ export const DEFAULT_WHATSAPP_TEMPLATES: DefaultWhatsappTemplate[] = [
     templateType: 'ACCOUNTING_DOCUMENTS',
     documentSubtype: 'INVOICE',
     isArchived: false,
-    body: 'Hi {{customer.name}},\n\nYour Invoice {{document.number}} from {{business.name}} is ready.\n\n- Invoice Number: {{document.number}}\n- Invoice Date: {{document.date}}\n- Due Date: {{document.due_date}}\n- Total Amount: {{document.currency}} {{document.total}}\n\nPlease review and let us know if you have any questions.',
+    body: 'Hi {{customer.name}},\n\nYour Invoice {{document.number}} from {{business.name}} is ready.\n\n- Invoice Number: {{document.number}}\n- Invoice Date: {{document.date}}\n- Due Date: {{document.due_date}}\n- Total Amount: {{document.total_with_currency}}\n\nPlease review and let us know if you have any questions.',
     whatsapp: {
       category: 'UTILITY',
       language: 'en',
@@ -47,7 +47,7 @@ export const DEFAULT_WHATSAPP_TEMPLATES: DefaultWhatsappTemplate[] = [
     templateType: 'ACCOUNTING_DOCUMENTS',
     documentSubtype: 'QUOTATION',
     isArchived: false,
-    body: 'Hi {{customer.name}},\n\nWe have prepared a Quotation for you.\n\n- Quotation Number: {{document.number}}\n- Date: {{document.date}}\n- Total Amount: {{document.currency}} {{document.total}}\n\nPlease review the details and let us know how you would like to proceed.',
+    body: 'Hi {{customer.name}},\n\nWe have prepared a Quotation for you.\n\n- Quotation Number: {{document.number}}\n- Date: {{document.date}}\n- Total Amount: {{document.total_with_currency}}\n\nPlease review the details and let us know how you would like to proceed.',
     whatsapp: {
       category: 'UTILITY',
       language: 'en',
@@ -65,7 +65,7 @@ export const DEFAULT_WHATSAPP_TEMPLATES: DefaultWhatsappTemplate[] = [
     templateType: 'ACCOUNTING_DOCUMENTS',
     documentSubtype: 'PAYMENT_RECEIPT',
     isArchived: false,
-    body: 'Hi {{customer.name}},\n\nThank you for your payment. Here is your Payment Receipt.\n\n- Receipt Number: {{document.number}}\n- Date: {{document.date}}\n- Amount Paid: {{document.currency}} {{document.amount_paid}}\n\nThank you for your business!',
+    body: 'Hi {{customer.name}},\n\nThank you for your payment. Here is your Payment Receipt.\n\n- Receipt Number: {{document.number}}\n- Date: {{document.date}}\n- Amount Paid: {{document.amount_paid_with_currency}}\n\nThank you for your business!',
     whatsapp: {
       category: 'UTILITY',
       language: 'en',

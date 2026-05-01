@@ -41,7 +41,8 @@ const DOCUMENT_SHARED_PREVIEW_VALUES = {
   'document.date': '22 Mar 2026',
   'document.due_date': '06 Apr 2026',
   'document.total': '12,500.00',
-  'document.currency': 'INR',
+  'document.currency': '₹',
+  'document.total_with_currency': '₹12,500.00',
   'document.share_link': 'https://share.refrens.local/documents/DOC-2026-001',
   'customer.name': 'Aarav Industries',
   'customer.email': 'accounts@aaravindustries.in',
@@ -60,6 +61,8 @@ const DOCUMENT_SUBTYPE_SAMPLE_OVERRIDES: Partial<
     'document.share_link': 'https://share.refrens.local/invoices/INV-2026-001',
     'document.amount_paid': '3,500.00',
     'document.amount_due': '9,000.00',
+    'document.amount_paid_with_currency': '₹3,500.00',
+    'document.amount_due_with_currency': '₹9,000.00',
   },
   PROFORMA_INVOICE: {
     'document.type': ACCOUNTING_DOCUMENT_SUBTYPES.PROFORMA_INVOICE.label,
@@ -107,6 +110,8 @@ const DOCUMENT_SUBTYPE_SAMPLE_OVERRIDES: Partial<
     'document.share_link': 'https://share.refrens.local/expenditures/EXP-2026-001',
     'document.amount_paid': '2,000.00',
     'document.amount_due': '4,500.00',
+    'document.amount_paid_with_currency': '₹2,000.00',
+    'document.amount_due_with_currency': '₹4,500.00',
   },
 };
 
@@ -184,6 +189,11 @@ const ACCOUNTING_SHARED_VARIABLE_OPTIONS: Omit<TemplateVariableOption, 'scope'>[
   { label: 'Document Total', value: 'document.total', group: 'Document' },
   { label: 'Document Currency', value: 'document.currency', group: 'Document' },
   {
+    label: 'Document Total (with currency)',
+    value: 'document.total_with_currency',
+    group: 'Document',
+  },
+  {
     label: 'Document Sharelink',
     value: 'document.share_link',
     group: 'Document',
@@ -201,6 +211,16 @@ const ACCOUNTING_SHARED_VARIABLE_OPTIONS: Omit<TemplateVariableOption, 'scope'>[
 const ACCOUNTING_PAYMENT_VARIABLE_OPTIONS: Omit<TemplateVariableOption, 'scope'>[] = [
   { label: 'Amount Paid', value: 'document.amount_paid', group: 'Document' },
   { label: 'Amount Due', value: 'document.amount_due', group: 'Document' },
+  {
+    label: 'Amount Paid (with currency)',
+    value: 'document.amount_paid_with_currency',
+    group: 'Document',
+  },
+  {
+    label: 'Amount Due (with currency)',
+    value: 'document.amount_due_with_currency',
+    group: 'Document',
+  },
 ];
 
 function getIndexedFieldEntries(

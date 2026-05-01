@@ -93,6 +93,20 @@ function getAllowedVariableKeys(input: WhatsappSubmissionTemplateInput) {
   return catalog.options.map((option) => option.value);
 }
 
+/**
+ * Meta rejects WhatsApp template body text where two `{{variable}}` tokens are
+ * separated only by whitespace — the error surfaces from AiSensy as
+ * "Invalid parameter ordering". Catch it client-side so the user sees a
+ * meaningful message naming the offending variables.
+ */
+const ADJACENT_VARIABLES_PATTERN = /\{\{([^}]+)\}\}\s+\{\{([^}]+)\}\}/;
+
+function findAdjacentVariablePair(value: string): [string, string] | null {
+  const match = ADJACENT_VARIABLES_PATTERN.exec(value);
+  if (!match) return null;
+  return [match[1].trim(), match[2].trim()];
+}
+
 function validateSupportedVariables(input: {
   value?: string;
   allowedVariableKeys: string[];
@@ -148,6 +162,14 @@ export function validateWhatsappTemplateForSubmission(input: WhatsappSubmissionT
 
   if (hasTemplateCtaTokens(body)) {
     errors.push('WhatsApp body cannot contain email CTA tokens.');
+  }
+
+  const adjacentBodyPair = findAdjacentVariablePair(body);
+  if (adjacentBodyPair) {
+    const [first, second] = adjacentBodyPair;
+    errors.push(
+      `WhatsApp body cannot place variables next to each other. Add static text between {{${first}}} and {{${second}}}.`,
+    );
   }
 
   if (header.length > WHATSAPP_TEXT_HEADER_MAX_LENGTH) {

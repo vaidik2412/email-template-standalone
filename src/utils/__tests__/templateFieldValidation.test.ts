@@ -14,6 +14,28 @@ describe('getTemplateFieldValidationError', () => {
     ).toMatch(/1024/i);
   });
 
+  it('rejects whatsapp bodies with two variables separated only by whitespace', () => {
+    expect(
+      getTemplateFieldValidationError({
+        channel: 'WHATSAPP',
+        fieldKind: 'body',
+        value: 'Total: {{document.currency}} {{document.total}} due.',
+        allowedVariableKeys: ['document.currency', 'document.total'],
+      }),
+    ).toMatch(/next to each other/i);
+  });
+
+  it('allows whatsapp bodies where variables are separated by static text', () => {
+    expect(
+      getTemplateFieldValidationError({
+        channel: 'WHATSAPP',
+        fieldKind: 'body',
+        value: 'Total of {{document.total}} in {{document.currency}}.',
+        allowedVariableKeys: ['document.currency', 'document.total'],
+      }),
+    ).toBeNull();
+  });
+
   it('rejects CTA tokens in whatsapp body with helpful message', () => {
     expect(
       getTemplateFieldValidationError({

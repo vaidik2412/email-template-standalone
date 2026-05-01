@@ -1,5 +1,6 @@
 import { ACCOUNTING_DOCUMENT_SUBTYPES } from '@/data/email/documentSubtypes';
 import { resolveTemplatePreviewText } from '@/components/templates/templatePreviewUtils';
+import { currencySymbol, formatAmountWithCurrency } from '@/utils/currencySymbol';
 
 import type {
   InvoiceEmailDrawerResolvedDraft,
@@ -21,7 +22,7 @@ const FALLBACK_INVOICE_EMAIL_TEMPLATES: InvoiceEmailDrawerTemplateOption[] = [
     documentSubtype: 'INVOICE',
     subject: 'Invoice {{document.number}} from {{business.name}}',
     body:
-      'Hi {{customer.name}},\n\nPlease find {{document.type}} {{document.number}} dated {{document.date}} for {{document.total}} {{document.currency}}.\n\nView it here: {{document.share_link}}\n\nRegards,\n{{business.name}}',
+      'Hi {{customer.name}},\n\nPlease find {{document.type}} {{document.number}} dated {{document.date}} for {{document.total_with_currency}}.\n\nView it here: {{document.share_link}}\n\nRegards,\n{{business.name}}',
   },
   {
     id: 'fallback-invoice-due-date',
@@ -30,7 +31,7 @@ const FALLBACK_INVOICE_EMAIL_TEMPLATES: InvoiceEmailDrawerTemplateOption[] = [
     documentSubtype: 'INVOICE',
     subject: '{{document.type}} {{document.number}} due on {{document.due_date}}',
     body:
-      'Hi {{customer.name}},\n\nSharing {{document.type}} {{document.number}} for {{document.total}} {{document.currency}}. The due date is {{document.due_date}}.\n\nYou can review it here: {{document.share_link}}\n\nThanks,\n{{business.name}}',
+      'Hi {{customer.name}},\n\nSharing {{document.type}} {{document.number}} for {{document.total_with_currency}}. The due date is {{document.due_date}}.\n\nYou can review it here: {{document.share_link}}\n\nThanks,\n{{business.name}}',
   },
   {
     id: 'fallback-invoice-payment-status',
@@ -39,7 +40,7 @@ const FALLBACK_INVOICE_EMAIL_TEMPLATES: InvoiceEmailDrawerTemplateOption[] = [
     documentSubtype: 'INVOICE',
     subject: 'Payment update for {{document.number}}',
     body:
-      'Hi {{customer.name}},\n\nHere is the current status for {{document.type}} {{document.number}}.\nAmount paid: {{document.amount_paid}}\nAmount due: {{document.amount_due}}\n\nOpen invoice: {{document.share_link}}\n\nRegards,\n{{business.name}}',
+      'Hi {{customer.name}},\n\nHere is the current status for {{document.type}} {{document.number}}.\nAmount paid: {{document.amount_paid_with_currency}}\nAmount due: {{document.amount_due_with_currency}}\n\nOpen invoice: {{document.share_link}}\n\nRegards,\n{{business.name}}',
   },
 ];
 
@@ -133,9 +134,18 @@ function buildInvoiceTemplatePreviewValues(invoice: Awaited<ReturnType<typeof ge
     'document.date': invoice.issueDate,
     'document.due_date': invoice.dueDate,
     'document.total': invoice.total,
-    'document.currency': invoice.currency,
+    'document.currency': currencySymbol(invoice.currency),
+    'document.total_with_currency': formatAmountWithCurrency(invoice.total, invoice.currency),
     'document.amount_paid': invoice.amountPaid,
     'document.amount_due': invoice.amountDue,
+    'document.amount_paid_with_currency': formatAmountWithCurrency(
+      invoice.amountPaid,
+      invoice.currency,
+    ),
+    'document.amount_due_with_currency': formatAmountWithCurrency(
+      invoice.amountDue,
+      invoice.currency,
+    ),
     'document.share_link': shareLink,
     'customer.name': invoice.customerName,
     'customer.email': invoice.customerEmail,

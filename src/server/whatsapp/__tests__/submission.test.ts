@@ -52,6 +52,17 @@ describe('validateWhatsappTemplateForSubmission', () => {
     expect(errors).toContain('WhatsApp footer cannot contain variables.');
   });
 
+  it('rejects body text with two variables separated only by whitespace', () => {
+    const errors = validateWhatsappTemplateForSubmission({
+      ...validTemplate,
+      body: 'Total: {{document.currency}} {{document.total}} due now.',
+    });
+
+    expect(errors).toContain(
+      'WhatsApp body cannot place variables next to each other. Add static text between {{document.currency}} and {{document.total}}.',
+    );
+  });
+
   it('rejects incomplete or over-variable URL buttons', () => {
     const errors = validateWhatsappTemplateForSubmission({
       ...validTemplate,

@@ -97,7 +97,7 @@ describe('invoice email drawer draft resolver', () => {
           name: 'Invoice Share',
           subject: 'Invoice {{document.number}} from {{business.name}}',
           body:
-            'Hi {{customer.name}},\nPlease review {{document.type}} {{document.number}} for {{document.total}} {{document.currency}}.\nView here: {{document.share_link}}\n{{unknown.value}}',
+            'Hi {{customer.name}},\nPlease review {{document.type}} {{document.number}} for {{document.total_with_currency}}.\nView here: {{document.share_link}}\n{{unknown.value}}',
           channel: 'EMAIL',
           templateType: 'ACCOUNTING_DOCUMENTS',
           documentSubtype: 'INVOICE',
@@ -138,7 +138,7 @@ describe('invoice email drawer draft resolver', () => {
       to: 'finance@alphacorp.in',
       subject: 'Invoice INV-SC6-102 from Tech Solutions Pvt Ltd',
       body:
-        'Hi Alpha Corp,\nPlease review Invoice INV-SC6-102 for 12,500.00 INR.\nView here: https://share.refrens.local/invoices/INV-SC6-102\n{{unknown.value}}',
+        'Hi Alpha Corp,\nPlease review Invoice INV-SC6-102 for ₹12,500.00.\nView here: https://share.refrens.local/invoices/INV-SC6-102\n{{unknown.value}}',
     });
   });
 
