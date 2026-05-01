@@ -25,6 +25,17 @@ describe('getTemplateFieldValidationError', () => {
     ).toMatch(/next to each other/i);
   });
 
+  it('rejects whatsapp bodies with two variables and no static text between them', () => {
+    expect(
+      getTemplateFieldValidationError({
+        channel: 'WHATSAPP',
+        fieldKind: 'body',
+        value: 'Total: {{document.currency}}{{document.total}} due.',
+        allowedVariableKeys: ['document.currency', 'document.total'],
+      }),
+    ).toMatch(/next to each other/i);
+  });
+
   it('allows whatsapp bodies where variables are separated by static text', () => {
     expect(
       getTemplateFieldValidationError({

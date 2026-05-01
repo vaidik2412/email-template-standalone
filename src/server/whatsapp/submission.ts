@@ -95,11 +95,11 @@ function getAllowedVariableKeys(input: WhatsappSubmissionTemplateInput) {
 
 /**
  * Meta rejects WhatsApp template body text where two `{{variable}}` tokens are
- * separated only by whitespace — the error surfaces from AiSensy as
+ * separated by no meaningful text — the error surfaces from AiSensy as
  * "Invalid parameter ordering". Catch it client-side so the user sees a
  * meaningful message naming the offending variables.
  */
-const ADJACENT_VARIABLES_PATTERN = /\{\{([^}]+)\}\}\s+\{\{([^}]+)\}\}/;
+const ADJACENT_VARIABLES_PATTERN = /\{\{([^}]+)\}\}\s*\{\{([^}]+)\}\}/;
 
 function findAdjacentVariablePair(value: string): [string, string] | null {
   const match = ADJACENT_VARIABLES_PATTERN.exec(value);

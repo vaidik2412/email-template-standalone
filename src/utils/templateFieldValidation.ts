@@ -3,7 +3,7 @@ import { findUnsupportedTemplateVariables } from './templateVariables';
 
 type TemplateFieldKind = 'subject' | 'body' | 'signature';
 const WHATSAPP_TEMPLATE_BODY_MAX_LENGTH = 1024;
-const WHATSAPP_ADJACENT_VARIABLES_PATTERN = /\{\{([^}]+)\}\}\s+\{\{([^}]+)\}\}/;
+const WHATSAPP_ADJACENT_VARIABLES_PATTERN = /\{\{([^}]+)\}\}\s*\{\{([^}]+)\}\}/;
 
 export function getTemplateFieldValidationError(input: {
   channel?: 'EMAIL' | 'WHATSAPP';
